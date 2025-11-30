@@ -1,0 +1,22 @@
+{
+  "id": "rollback-1764467387506-mqdzz4j9m",
+  "timestamp": "2025-11-30T01:49:47.506Z",
+  "changes": {
+    "type": "workflow_step",
+    "step": "Planning",
+    "persona": "PM",
+    "artifacts": [
+      {
+        "type": "PRD",
+        "description": "Product Requirements Document",
+        "content": "# Product Requirements\n\n## Overview\nAutonomous AI development system...",
+        "metadata": {
+          "version": "1.0.0",
+          "priority": "high",
+          "estimatedEffort": "2 weeks"
+        }
+      }
+    ]
+  },
+  "state": {}
+}

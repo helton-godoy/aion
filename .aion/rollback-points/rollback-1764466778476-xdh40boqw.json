@@ -1,0 +1,22 @@
+{
+  "id": "rollback-1764466778476-xdh40boqw",
+  "timestamp": "2025-11-30T01:39:38.476Z",
+  "changes": {
+    "type": "workflow_step",
+    "step": "Release",
+    "persona": "RELEASE",
+    "artifacts": [
+      {
+        "type": "RELEASE",
+        "description": "Release deployment",
+        "content": "## Release Notes\n\nVersion 1.0.0 released",
+        "metadata": {
+          "version": "1.0.0",
+          "tag": "v1.0.0",
+          "deployment": "successful"
+        }
+      }
+    ]
+  },
+  "state": {}
+}

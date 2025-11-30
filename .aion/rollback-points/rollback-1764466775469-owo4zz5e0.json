@@ -1,0 +1,22 @@
+{
+  "id": "rollback-1764466775469-owo4zz5e0",
+  "timestamp": "2025-11-30T01:39:35.469Z",
+  "changes": {
+    "type": "workflow_step",
+    "step": "Architecture",
+    "persona": "ARCHITECT",
+    "artifacts": [
+      {
+        "type": "TECH_SPEC",
+        "description": "Technical Specification",
+        "content": "# Technical Specification\n\n## Architecture\nThree-layer architecture...",
+        "metadata": {
+          "framework": "BMAD-METHOD",
+          "platform": "GitHub Native",
+          "complexity": "medium"
+        }
+      }
+    ]
+  },
+  "state": {}
+}

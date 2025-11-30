@@ -1,0 +1,27 @@
+{
+  "version": "1.0.0",
+  "createdAt": "2025-11-30T01:48:52.803Z",
+  "github": {
+    "owner": "helton-godoy",
+    "repo": "aion",
+    "visibility": "public",
+    "features": [
+      "issues",
+      "pulls",
+      "actions",
+      "releases",
+      "projects",
+      "discussions"
+    ],
+    "branchStrategy": "github",
+    "autoMerge": false,
+    "autoRelease": true
+  },
+  "aion": {
+    "integration": "github-native",
+    "workflowEngine": "actions",
+    "memoryBank": "issues",
+    "stateMachine": "projects",
+    "safetyProtocol": "branches"
+  }
+}

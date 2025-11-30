@@ -1,0 +1,22 @@
+{
+  "id": "rollback-1764464701429-tp8kofa68",
+  "timestamp": "2025-11-30T01:05:01.429Z",
+  "changes": {
+    "type": "workflow_step",
+    "step": "Testing",
+    "persona": "QA",
+    "artifacts": [
+      {
+        "type": "TEST_RESULTS",
+        "description": "Quality assurance results",
+        "content": "## Test Results\n\nAll tests passed: 45/45",
+        "metadata": {
+          "passed": 45,
+          "failed": 0,
+          "coverage": "95%"
+        }
+      }
+    ]
+  },
+  "state": {}
+}
