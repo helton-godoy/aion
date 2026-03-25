@@ -7,6 +7,7 @@
 const { program } = require('commander');
 const chalk = require('chalk');
 const figlet = require('figlet');
+const pkg = require('../../package.json');
 
 // Display welcome banner
 console.log(
@@ -58,27 +59,35 @@ program
     // TODO: Implement state reset logic
   });
 
+/**
+ * Generic list function for AION entities (agents, workflows, etc.)
+ * @param {string} title - The title to display
+ * @param {Object} entities - The entities object from package.json
+ */
+const listEntities = (title, entities) => {
+  console.log(chalk.blue(title));
+  if (entities && typeof entities === 'object') {
+    Object.values(entities).forEach(entity => {
+      const name = typeof entity === 'object' ? entity.name : entity;
+      console.log(chalk.gray(`- ${name}`));
+    });
+  } else {
+    console.log(chalk.yellow('No items configured in package.json'));
+  }
+};
+
 program
   .command('agents:list')
   .description('List available AION agents')
   .action(() => {
-    console.log(chalk.blue('🤖 Available AION agents:'));
-    console.log(chalk.gray('- GitHub PM (Product Manager)'));
-    console.log(chalk.gray('- GitHub Architect'));
-    console.log(chalk.gray('- GitHub Developer'));
-    console.log(chalk.gray('- GitHub QA'));
-    // TODO: Implement agent listing logic
+    listEntities('🤖 Available AION agents:', pkg.aion?.agents);
   });
 
 program
   .command('workflows:list')
   .description('List available AION workflows')
   .action(() => {
-    console.log(chalk.blue('📋 Available AION workflows:'));
-    console.log(chalk.gray('- GitHub Full Cycle'));
-    console.log(chalk.gray('- Memory Status Check'));
-    console.log(chalk.gray('- State Reset'));
-    // TODO: Implement workflow listing logic
+    listEntities('📋 Available AION workflows:', pkg.aion?.workflows);
   });
 
 // Parse command line arguments
