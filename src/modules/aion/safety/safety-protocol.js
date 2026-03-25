@@ -13,7 +13,7 @@ class SafetyProtocol {
     this.projectRoot = projectRoot;
     this.commitTracker = [];
     this.rollbackManager = new RollbackManager(projectRoot);
-    this.validationGates = new ValidationGates();
+    this.validationGates = new ValidationGates(projectRoot);
   }
 
   /**
@@ -348,9 +348,9 @@ class RollbackManager {
  * Validation Gates
  */
 class ValidationGates {
-  constructor() {
+  constructor(projectRoot) {
     this.validators = [
-      new FileValidator(),
+      new FileValidator(projectRoot),
       new ContentValidator(),
       new SecurityValidator()
     ];
@@ -374,10 +374,27 @@ class ValidationGates {
  * File Validator
  */
 class FileValidator {
+  constructor(projectRoot) {
+    this.projectRoot = projectRoot;
+  }
+
   async validate(changes) {
     if (changes.files) {
+      const normalizedRoot = path.resolve(this.projectRoot);
+
       for (const fileChange of changes.files) {
-        if (fileChange.path.includes('..')) {
+        // Resolve path to handle '..' and absolute paths
+        const resolvedPath = path.resolve(this.projectRoot, fileChange.path);
+
+        // Ensure resolved path is within project root
+        const relative = path.relative(normalizedRoot, resolvedPath);
+        const isSafe = relative && !relative.startsWith('..') && !path.isAbsolute(relative);
+
+        // Special case: if relative is empty, it means resolvedPath is normalizedRoot itself
+        // which might or might not be allowed depending on the use case.
+        // For files, usually we want it to be INSIDE the root.
+
+        if (!isSafe && resolvedPath !== normalizedRoot) {
           throw new Error('Path traversal detected');
         }
         
