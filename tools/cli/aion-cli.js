@@ -7,6 +7,7 @@
 const { program } = require('commander');
 const chalk = require('chalk');
 const figlet = require('figlet');
+const AIONInitializer = require('../aion/aion-init');
 
 // Display welcome banner
 console.log(
@@ -28,10 +29,9 @@ program
 program
   .command('init')
   .description('Initialize AION project')
-  .action(() => {
-    console.log(chalk.blue('🚀 Initializing AION project...'));
-    console.log(chalk.gray('This will setup BMAD foundation and AION modules'));
-    // TODO: Implement initialization logic
+  .action(async () => {
+    const initializer = new AIONInitializer();
+    await initializer.init();
   });
 
 program
