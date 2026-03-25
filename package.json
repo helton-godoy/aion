@@ -28,6 +28,8 @@
     "aion:state:reset": "node tools/aion/state-reset.js",
     "aion:agents:list": "node tools/aion/list-agents.js",
     "aion:setup:github": "node tools/aion/github-setup.js",
+    "aion:safety:validate": "node tools/aion/safety-validate.js",
+    "aion:safety:check-commits": "node tools/aion/check-commits.js",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
