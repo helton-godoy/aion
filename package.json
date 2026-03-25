@@ -100,15 +100,36 @@
       "platform"
     ],
     "workflows": {
-      "github-full-cycle": "tools/aion/github-full-cycle.js",
-      "memory-status": "tools/aion/memory-status.js",
-      "state-reset": "tools/aion/state-reset.js"
+      "github-full-cycle": {
+        "name": "GitHub Full Cycle",
+        "path": "tools/aion/github-full-cycle.js"
+      },
+      "memory-status": {
+        "name": "Memory Status Check",
+        "path": "tools/aion/memory-status.js"
+      },
+      "state-reset": {
+        "name": "State Reset",
+        "path": "tools/aion/state-reset.js"
+      }
     },
     "agents": {
-      "github-pm": "src/modules/aion/agents/github-pm.js",
-      "github-architect": "src/modules/aion/agents/github-architect.js",
-      "github-developer": "src/modules/aion/agents/github-developer.js",
-      "github-qa": "src/modules/aion/agents/github-qa.js"
+      "github-pm": {
+        "name": "GitHub PM (Product Manager)",
+        "path": "src/modules/aion/agents/github-pm.js"
+      },
+      "github-architect": {
+        "name": "GitHub Architect",
+        "path": "src/modules/aion/agents/github-architect.js"
+      },
+      "github-developer": {
+        "name": "GitHub Developer",
+        "path": "src/modules/aion/agents/github-developer.js"
+      },
+      "github-qa": {
+        "name": "GitHub QA",
+        "path": "src/modules/aion/agents/github-qa.js"
+      }
     },
     "quality": {
       "test-coverage": ">=90%",
