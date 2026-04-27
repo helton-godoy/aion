@@ -68,12 +68,14 @@ class MemoryManager {
    */
   async loadProductContext() {
     try {
-      if (await fs.pathExists(this.productContextPath)) {
-        const content = await fs.readFile(this.productContextPath, 'utf8');
-        return this.parseMarkdownContent(content);
-      }
-      return this.getDefaultProductContext();
+      // BOLT OPTIMIZATION: Avoid double I/O. Instead of checking pathExists then reading,
+      // just try reading and handle ENOENT.
+      const content = await fs.readFile(this.productContextPath, 'utf8');
+      return this.parseMarkdownContent(content);
     } catch (error) {
+      if (error.code === 'ENOENT') {
+        return this.getDefaultProductContext();
+      }
       console.warn(chalk.yellow(`⚠️  Could not load product context: ${error.message}`));
       return this.getDefaultProductContext();
     }
@@ -84,12 +86,14 @@ class MemoryManager {
    */
   async loadActiveContext() {
     try {
-      if (await fs.pathExists(this.activeContextPath)) {
-        const content = await fs.readFile(this.activeContextPath, 'utf8');
-        return this.parseMarkdownContent(content);
-      }
-      return this.getDefaultActiveContext();
+      // BOLT OPTIMIZATION: Avoid double I/O. Instead of checking pathExists then reading,
+      // just try reading and handle ENOENT.
+      const content = await fs.readFile(this.activeContextPath, 'utf8');
+      return this.parseMarkdownContent(content);
     } catch (error) {
+      if (error.code === 'ENOENT') {
+        return this.getDefaultActiveContext();
+      }
       console.warn(chalk.yellow(`⚠️  Could not load active context: ${error.message}`));
       return this.getDefaultActiveContext();
     }
@@ -311,17 +315,31 @@ class MemoryManager {
   async getStatus() {
     const context = await this.getContext();
     
+    // BOLT OPTIMIZATION: Consolidate pathExists and stat into a single stat call.
+    // stat throws ENOENT if it doesn't exist, reducing I/O operations from up to 3 to 1 per file.
+    const getFileStats = async (filePath) => {
+      try {
+        const stats = await fs.stat(filePath);
+        return { exists: true, size: stats.size };
+      } catch (error) {
+        return { exists: false, size: 0 };
+      }
+    };
+
+    const [productStats, activeStats] = await Promise.all([
+      getFileStats(this.productContextPath),
+      getFileStats(this.activeContextPath)
+    ]);
+
     return {
       productContext: {
-        exists: await fs.pathExists(this.productContextPath),
-        size: await fs.pathExists(this.productContextPath) ? 
-          (await fs.stat(this.productContextPath)).size : 0,
+        exists: productStats.exists,
+        size: productStats.size,
         artifacts: context.product.artifacts?.length || 0
       },
       activeContext: {
-        exists: await fs.pathExists(this.activeContextPath),
-        size: await fs.pathExists(this.activeContextPath) ? 
-          (await fs.stat(this.activeContextPath)).size : 0,
+        exists: activeStats.exists,
+        size: activeStats.size,
         activePersonas: Object.keys(context.active.personas || {}).length
       },
       totalArtifacts: context.combined.artifacts?.length || 0,
