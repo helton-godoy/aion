@@ -76,8 +76,16 @@ class GitHubSetupTool {
   }
 
   async isConfigured() {
-    return await fs.pathExists(this.configPath) && 
-           await fs.pathExists(this.envPath);
+    // BOLT OPTIMIZATION: Concurrent stat checks to avoid double sequential I/O
+    try {
+      await Promise.all([
+        fs.stat(this.configPath),
+        fs.stat(this.envPath)
+      ]);
+      return true;
+    } catch (error) {
+      return false;
+    }
   }
 
   async collectConfiguration() {
@@ -266,8 +274,13 @@ class GitHubSetupTool {
 
     // Update .env file
     let envContent = '';
-    if (await fs.pathExists(this.envPath)) {
+    try {
+      // BOLT OPTIMIZATION: Avoid double I/O. Try reading and handle ENOENT instead of checking pathExists.
       envContent = await fs.readFile(this.envPath, 'utf8');
+    } catch (error) {
+      if (error.code !== 'ENOENT') {
+        throw error;
+      }
     }
 
     // Add or update GitHub configuration

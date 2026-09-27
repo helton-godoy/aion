@@ -1,0 +1,3 @@
+## 2025-07-02 - [I/O Performance] Avoiding Double I/O with ENOENT
+**Learning:** Checking for file existence before reading (`fs.pathExists` followed by `fs.readFile`) or writing causes an unnecessary extra I/O operation which is a performance anti-pattern. This is frequently found across AION components like `StateMachine` and CLI setup tools.
+**Action:** Instead of checking for existence, directly use `try...catch` when attempting `fs.readFile` and gracefully handle the `ENOENT` error. For sequential `fs.pathExists` checks on multiple files, use `Promise.all` with `fs.stat` for concurrent evaluation.

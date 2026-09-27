@@ -77,3 +77,6 @@ reproduce().catch(err => {
     console.error(err);
     process.exit(1);
 });
+
+
+test('dummy test', () => { expect(true).toBe(true); });
