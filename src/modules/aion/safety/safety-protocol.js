@@ -281,11 +281,16 @@ class RollbackManager {
     
     const pointPath = path.join(this.rollbackPointsPath, `${commit.rollbackPoint}.json`);
     
-    if (!(await fs.pathExists(pointPath))) {
-      throw new Error(`Rollback point ${commit.rollbackPoint} not found`);
+    let rollbackPoint;
+    try {
+      // BOLT OPTIMIZATION: Avoid redundant fs.pathExists check, rely on try/catch to handle ENOENT directly
+      rollbackPoint = await fs.readJSON(pointPath);
+    } catch (error) {
+      if (error.code === 'ENOENT') {
+        throw new Error(`Rollback point ${commit.rollbackPoint} not found`);
+      }
+      throw error;
     }
-    
-    const rollbackPoint = await fs.readJSON(pointPath);
     
     // Restore state
     await this.restoreState(rollbackPoint.state);
@@ -299,7 +304,7 @@ class RollbackManager {
   async captureCurrentState(changes) {
     const state = {};
     
-    if (changes.files) {
+    if (changes.files && changes.files.length > 0) {
       state.files = {};
       // ⚡ Bolt: Optimize I/O by chunking concurrent operations (prevent EMFILE),
       // parallelizing read/stat, and avoiding redundant pathExists checks.
@@ -326,6 +331,12 @@ class RollbackManager {
         for (const { path, info } of results) {
           state.files[path] = info;
         }
+      };
+
+      // BOLT OPTIMIZATION: Use Promise.all to fetch file states in parallel rather than sequentially in a loop.
+      const fileStates = await Promise.all(changes.files.map(captureFile));
+      for (const fileState of fileStates) {
+        state.files[fileState.path] = fileState.info;
       }
     }
     
