@@ -174,7 +174,6 @@ describe('SafetyProtocol State Management & Utilities', () => {
   describe('loadCommitTracker', () => {
     it('should load commit tracker if file exists', async () => {
       const trackerData = [{ id: '1' }];
-      fs.pathExists.mockResolvedValue(true);
       fs.readJSON.mockResolvedValue(trackerData);
 
       await safetyProtocol.loadCommitTracker();
@@ -183,16 +182,18 @@ describe('SafetyProtocol State Management & Utilities', () => {
     });
 
     it('should initialize empty if file does not exist', async () => {
-      fs.pathExists.mockResolvedValue(false);
+      fs.readJSON.mockRejectedValue(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }));
+
       await safetyProtocol.loadCommitTracker();
+
       expect(safetyProtocol.commitTracker).toEqual([]);
     });
 
     it('should handle load error gracefully', async () => {
-      fs.pathExists.mockResolvedValue(true);
       fs.readJSON.mockRejectedValue(new Error('Load error'));
 
       await safetyProtocol.loadCommitTracker();
+
       expect(safetyProtocol.commitTracker).toEqual([]);
     });
   });
@@ -277,7 +278,6 @@ describe('SafetyProtocol Change Execution & Helper Classes', () => {
   describe('RollbackManager', () => {
     it('should create a rollback point', async () => {
       const changes = { files: [] };
-      fs.pathExists.mockResolvedValue(false); // for captureCurrentState
 
       const pointId = await safetyProtocol.rollbackManager.createPoint(changes);
 
@@ -288,7 +288,6 @@ describe('SafetyProtocol Change Execution & Helper Classes', () => {
 
     it('should capture current state during createPoint', async () => {
       const changes = { files: [{ path: 'existing.js' }] };
-      fs.pathExists.mockResolvedValue(true);
       fs.readFile.mockResolvedValue('old content');
       fs.stat.mockResolvedValue({ size: 100 });
 
@@ -314,7 +313,6 @@ describe('SafetyProtocol Change Execution & Helper Classes', () => {
         }
       };
 
-      fs.pathExists.mockResolvedValue(true);
       fs.readJSON.mockResolvedValue(rbPoint);
 
       await safetyProtocol.rollbackManager.rollback(commit);
