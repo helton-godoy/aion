@@ -1,0 +1,3 @@
+## 2024-07-03 - [Optimize SafetyProtocol.captureCurrentState file operations]
+**Learning:** Found a performance bottleneck in `SafetyProtocol.captureCurrentState` when it loops over `changes.files` sequentially and uses redundant `fs.pathExists` before `fs.readFile` and `fs.stat`. This architecture can cause slowdowns when capturing rollback states with a large number of files.
+**Action:** Use chunked `Promise.all` for concurrent file reads/stats to avoid EMFILE limits, handle `ENOENT` natively instead of using `fs.pathExists`, and maintain deterministic key order in the resulting state object.
