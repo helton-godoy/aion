@@ -301,16 +301,26 @@ class RollbackManager {
       for (const fileChange of changes.files) {
         const filePath = path.join(this.projectRoot, fileChange.path);
         
-        if (await fs.pathExists(filePath)) {
+        // ⚡ Bolt: Optimize file I/O by executing readFile and stat concurrently
+        // and relying on native ENOENT errors rather than an extra fs.pathExists check
+        try {
+          const [content, stats] = await Promise.all([
+            fs.readFile(filePath, 'utf8'),
+            fs.stat(filePath)
+          ]);
           state.files[fileChange.path] = {
             exists: true,
-            content: await fs.readFile(filePath, 'utf8'),
-            stats: await fs.stat(filePath)
+            content,
+            stats
           };
-        } else {
-          state.files[fileChange.path] = {
-            exists: false
-          };
+        } catch (error) {
+          if (error.code === 'ENOENT') {
+            state.files[fileChange.path] = {
+              exists: false
+            };
+          } else {
+            throw error;
+          }
         }
       }
     }
