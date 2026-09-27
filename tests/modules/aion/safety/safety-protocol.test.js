@@ -276,19 +276,25 @@ describe('SafetyProtocol Change Execution & Helper Classes', () => {
 
   describe('RollbackManager', () => {
     it('should create a rollback point', async () => {
-      const changes = { files: [] };
-      fs.pathExists.mockResolvedValue(false); // for captureCurrentState
+      const changes = { files: [{ path: 'missing.js' }] };
+      // Simulate file not existing for the new captureCurrentState logic
+      const enoentError = new Error('ENOENT');
+      enoentError.code = 'ENOENT';
+      fs.readFile.mockRejectedValue(enoentError);
 
       const pointId = await safetyProtocol.rollbackManager.createPoint(changes);
 
       expect(pointId).toMatch(/^rollback-/);
       expect(fs.ensureDir).toHaveBeenCalled();
       expect(fs.writeJSON).toHaveBeenCalled();
+
+      const callArgs = fs.writeJSON.mock.calls[0];
+      const savedPoint = callArgs[1];
+      expect(savedPoint.state.files['missing.js']).toEqual({ exists: false });
     });
 
     it('should capture current state during createPoint', async () => {
       const changes = { files: [{ path: 'existing.js' }] };
-      fs.pathExists.mockResolvedValue(true);
       fs.readFile.mockResolvedValue('old content');
       fs.stat.mockResolvedValue({ size: 100 });
 

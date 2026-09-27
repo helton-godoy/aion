@@ -1,0 +1,3 @@
+## 2025-03-05 - File System I/O "Double-Check" Anti-Pattern
+**Learning:** Checking `fs.pathExists` immediately before calling `fs.readFile` or `fs.stat` introduces a race condition and doubles disk I/O. In large projects (like a rollback system capturing state for many files), iterating sequentially with this pattern causes severe bottlenecks.
+**Action:** When capturing multiple file states, execute independent operations per file (e.g., `readFile` and `stat`) concurrently using `Promise.all`. Wrap these operations in a `try/catch` block that traps `ENOENT` to safely and natively determine if a file is missing. When processing many files, use chunked `Promise.all` bounds (e.g., chunks of 20) to prevent OS file descriptor exhaustion (EMFILE).
