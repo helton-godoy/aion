@@ -298,19 +298,38 @@ class RollbackManager {
     
     if (changes.files) {
       state.files = {};
-      for (const fileChange of changes.files) {
-        const filePath = path.join(this.projectRoot, fileChange.path);
+
+      // ⚡ Bolt: Chunked parallel execution for I/O efficiency while preventing EMFILE
+      const chunkSize = 20;
+      for (let i = 0; i < changes.files.length; i += chunkSize) {
+        const chunk = changes.files.slice(i, i + chunkSize);
         
-        if (await fs.pathExists(filePath)) {
-          state.files[fileChange.path] = {
-            exists: true,
-            content: await fs.readFile(filePath, 'utf8'),
-            stats: await fs.stat(filePath)
-          };
-        } else {
-          state.files[fileChange.path] = {
-            exists: false
-          };
+        // ⚡ Bolt: Use Promise.all to fetch file info in parallel
+        // ⚡ Bolt: Avoid sequential fs.pathExists. Catch ENOENT directly instead.
+        const chunkResults = await Promise.all(chunk.map(async (fileChange) => {
+          const filePath = path.join(this.projectRoot, fileChange.path);
+          try {
+            // Read content and stats concurrently
+            const [content, stats] = await Promise.all([
+              fs.readFile(filePath, 'utf8'),
+              fs.stat(filePath)
+            ]);
+
+            return {
+              path: fileChange.path,
+              data: { exists: true, content, stats }
+            };
+          } catch (error) {
+            if (error.code === 'ENOENT') {
+              return { path: fileChange.path, data: { exists: false } };
+            }
+            throw error;
+          }
+        }));
+
+        // Synchronously populate state mappings to ensure determinism
+        for (const result of chunkResults) {
+          state.files[result.path] = result.data;
         }
       }
     }

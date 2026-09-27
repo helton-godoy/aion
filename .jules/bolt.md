@@ -1,0 +1,3 @@
+## 2025-02-14 - Optimize I/O concurrency in state capture
+**Learning:** Sequential existence checks (`fs.pathExists`) followed by separate sequential read operations (`fs.readFile` and `fs.stat`) create unnecessary bottlenecks. Utilizing `Promise.all` for parallel operations combined with chunking handles EMFILE limits elegantly while reducing I/O wait times, and we can rely on native `ENOENT` error catching rather than proactive existence checks.
+**Action:** When capturing multiple file states, avoid explicit `fs.pathExists` and run `fs.readFile` / `fs.stat` in parallel via `Promise.all`. Wrap the operation in a `try/catch` and gracefully handle the `ENOENT` code to optimize execution while still remaining safe.
