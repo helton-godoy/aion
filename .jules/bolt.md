@@ -1,0 +1,5 @@
+## 2025-03-09 - Parallelizing Sequential File System Checks in Promise.all
+
+**Learning:** I discovered a codebase pattern where file system properties were sequentially checked multiple times per file (e.g., checking `fs.pathExists` before reading a file, or checking `fs.pathExists` twice before a sequential `fs.stat` across multiple files). The optimization here goes beyond a simple node API preference—switching to optimistic try/catch reduces synchronous file I/O locks, and grouping independent file reads into `Promise.all` yields a major performance boost over serial checks.
+
+**Action:** Whenever I see sequential reads or checks against the file system (`fs.readFile`, `fs.stat`) across multiple independent files, I should automatically refactor them to run concurrently using `Promise.all`. For single operations, directly execute the I/O request (e.g., `fs.readFile`) and catch `ENOENT` natively to prevent redundant file system lookups.

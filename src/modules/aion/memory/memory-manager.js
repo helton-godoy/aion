@@ -68,13 +68,14 @@ class MemoryManager {
    */
   async loadProductContext() {
     try {
-      if (await fs.pathExists(this.productContextPath)) {
-        const content = await fs.readFile(this.productContextPath, 'utf8');
-        return this.parseMarkdownContent(content);
-      }
-      return this.getDefaultProductContext();
+      // ⚡ Bolt Optimization: Use optimistic read instead of sequential check-then-read
+      // Removes an unnecessary file system I/O call (pathExists -> stat)
+      const content = await fs.readFile(this.productContextPath, 'utf8');
+      return this.parseMarkdownContent(content);
     } catch (error) {
-      console.warn(chalk.yellow(`⚠️  Could not load product context: ${error.message}`));
+      if (error.code !== 'ENOENT') {
+        console.warn(chalk.yellow(`⚠️  Could not load product context: ${error.message}`));
+      }
       return this.getDefaultProductContext();
     }
   }
@@ -84,13 +85,14 @@ class MemoryManager {
    */
   async loadActiveContext() {
     try {
-      if (await fs.pathExists(this.activeContextPath)) {
-        const content = await fs.readFile(this.activeContextPath, 'utf8');
-        return this.parseMarkdownContent(content);
-      }
-      return this.getDefaultActiveContext();
+      // ⚡ Bolt Optimization: Use optimistic read instead of sequential check-then-read
+      // Removes an unnecessary file system I/O call (pathExists -> stat)
+      const content = await fs.readFile(this.activeContextPath, 'utf8');
+      return this.parseMarkdownContent(content);
     } catch (error) {
-      console.warn(chalk.yellow(`⚠️  Could not load active context: ${error.message}`));
+      if (error.code !== 'ENOENT') {
+        console.warn(chalk.yellow(`⚠️  Could not load active context: ${error.message}`));
+      }
       return this.getDefaultActiveContext();
     }
   }
@@ -311,17 +313,23 @@ class MemoryManager {
   async getStatus() {
     const context = await this.getContext();
     
+    // ⚡ Bolt Optimization: Execute all independent file system calls in parallel
+    // and use try/catch instead of sequential pathExists -> stat calls
+    // Reduces 4 sequential I/O operations to 2 parallel ones.
+    const [productStat, activeStat] = await Promise.all([
+      fs.stat(this.productContextPath).catch(() => null),
+      fs.stat(this.activeContextPath).catch(() => null)
+    ]);
+
     return {
       productContext: {
-        exists: await fs.pathExists(this.productContextPath),
-        size: await fs.pathExists(this.productContextPath) ? 
-          (await fs.stat(this.productContextPath)).size : 0,
+        exists: !!productStat,
+        size: productStat ? productStat.size : 0,
         artifacts: context.product.artifacts?.length || 0
       },
       activeContext: {
-        exists: await fs.pathExists(this.activeContextPath),
-        size: await fs.pathExists(this.activeContextPath) ? 
-          (await fs.stat(this.activeContextPath)).size : 0,
+        exists: !!activeStat,
+        size: activeStat ? activeStat.size : 0,
         activePersonas: Object.keys(context.active.personas || {}).length
       },
       totalArtifacts: context.combined.artifacts?.length || 0,
