@@ -183,7 +183,7 @@ describe('SafetyProtocol State Management & Utilities', () => {
     });
 
     it('should initialize empty if file does not exist', async () => {
-      fs.pathExists.mockResolvedValue(false);
+      fs.readJSON.mockRejectedValue(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }));
       await safetyProtocol.loadCommitTracker();
       expect(safetyProtocol.commitTracker).toEqual([]);
     });
@@ -277,7 +277,7 @@ describe('SafetyProtocol Change Execution & Helper Classes', () => {
   describe('RollbackManager', () => {
     it('should create a rollback point', async () => {
       const changes = { files: [] };
-      fs.pathExists.mockResolvedValue(false); // for captureCurrentState
+      fs.readFile.mockRejectedValue(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }));
 
       const pointId = await safetyProtocol.rollbackManager.createPoint(changes);
 
@@ -288,7 +288,6 @@ describe('SafetyProtocol Change Execution & Helper Classes', () => {
 
     it('should capture current state during createPoint', async () => {
       const changes = { files: [{ path: 'existing.js' }] };
-      fs.pathExists.mockResolvedValue(true);
       fs.readFile.mockResolvedValue('old content');
       fs.stat.mockResolvedValue({ size: 100 });
 

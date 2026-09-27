@@ -202,12 +202,16 @@ class SafetyProtocol {
     const trackerPath = path.join(this.projectRoot, '.aion', 'commit-tracker.json');
     
     try {
-      if (await fs.pathExists(trackerPath)) {
-        this.commitTracker = await fs.readJSON(trackerPath);
-      }
+      // BOLT OPTIMIZATION: Avoid double I/O. Instead of checking pathExists then reading,
+      // just try reading and handle ENOENT.
+      this.commitTracker = await fs.readJSON(trackerPath);
     } catch (error) {
-      console.warn(chalk.yellow(`⚠️  Could not load commit tracker: ${error.message}`));
-      this.commitTracker = [];
+      if (error.code === 'ENOENT') {
+        this.commitTracker = [];
+      } else {
+        console.warn(chalk.yellow(`⚠️  Could not load commit tracker: ${error.message}`));
+        this.commitTracker = [];
+      }
     }
   }
 
@@ -298,19 +302,41 @@ class RollbackManager {
     
     if (changes.files) {
       state.files = {};
-      for (const fileChange of changes.files) {
-        const filePath = path.join(this.projectRoot, fileChange.path);
+      // BOLT OPTIMIZATION: Avoid double I/O. Instead of checking pathExists then reading/stat,
+      // use Promise.all to fetch both simultaneously and handle ENOENT.
+      // Used chunked Promise.all to prevent EMFILE errors with large numbers of files.
+      const CHUNK_SIZE = 20;
+      for (let i = 0; i < changes.files.length; i += CHUNK_SIZE) {
+        const chunk = changes.files.slice(i, i + CHUNK_SIZE);
+        const promises = chunk.map(async (fileChange) => {
+          const filePath = path.join(this.projectRoot, fileChange.path);
+          try {
+            const [content, stats] = await Promise.all([
+              fs.readFile(filePath, 'utf8'),
+              fs.stat(filePath)
+            ]);
+            return {
+              path: fileChange.path,
+              data: {
+                exists: true,
+                content,
+                stats
+              }
+            };
+          } catch (error) {
+            if (error.code === 'ENOENT') {
+              return {
+                path: fileChange.path,
+                data: { exists: false }
+              };
+            }
+            throw error;
+          }
+        });
         
-        if (await fs.pathExists(filePath)) {
-          state.files[fileChange.path] = {
-            exists: true,
-            content: await fs.readFile(filePath, 'utf8'),
-            stats: await fs.stat(filePath)
-          };
-        } else {
-          state.files[fileChange.path] = {
-            exists: false
-          };
+        const results = await Promise.all(promises);
+        for (const result of results) {
+          state.files[result.path] = result.data;
         }
       }
     }
