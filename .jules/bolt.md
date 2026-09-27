@@ -1,0 +1,3 @@
+## 2024-05-09 - Parallel File Capture Optimization
+**Learning:** The `RollbackManager`'s `captureCurrentState` was a bottleneck because it used a sequential `for...of` loop to gather state for file changes, and made redundant `fs.pathExists` checks before reading.
+**Action:** When capturing multiple file states during rollback or backup operations, avoid `fs.pathExists`, rely on handling `ENOENT` natively, and use chunked `Promise.all` to perform independent file system queries (`fs.readFile` and `fs.stat`) concurrently. This drastically reduces sequential disk I/O waits without exhausting file descriptors.
