@@ -305,19 +305,16 @@ class RollbackManager {
     
     if (changes.files && changes.files.length > 0) {
       state.files = {};
-
-      // Chunk processing to avoid EMFILE
+      // ⚡ Bolt Optimization: Process files in chunks using Promise.all to maximize concurrent I/O.
+      // Removed sequential fs.pathExists checks, preferring native ENOENT handling to avoid race conditions.
       const chunkSize = 20;
+
       for (let i = 0; i < changes.files.length; i += chunkSize) {
         const chunk = changes.files.slice(i, i + chunkSize);
         
-        // Process chunk concurrently
         const results = await Promise.all(chunk.map(async (fileChange) => {
           const filePath = path.join(this.projectRoot, fileChange.path);
-
           try {
-            // BOLT OPTIMIZATION: Avoid fs.pathExists check, rely on ENOENT instead,
-            // and execute readFile and stat concurrently to optimize disk I/O
             const [content, stats] = await Promise.all([
               fs.readFile(filePath, 'utf8'),
               fs.stat(filePath)
@@ -327,8 +324,8 @@ class RollbackManager {
               path: fileChange.path,
               data: {
                 exists: true,
-                content: content,
-                stats: stats
+                content,
+                stats
               }
             };
           } catch (error) {
@@ -344,7 +341,6 @@ class RollbackManager {
           }
         }));
 
-        // Sync populate to maintain deterministic insertion order
         for (const result of results) {
           state.files[result.path] = result.data;
         }
