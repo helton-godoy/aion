@@ -296,21 +296,43 @@ class RollbackManager {
   async captureCurrentState(changes) {
     const state = {};
     
-    if (changes.files) {
+    if (changes.files && changes.files.length > 0) {
       state.files = {};
-      for (const fileChange of changes.files) {
-        const filePath = path.join(this.projectRoot, fileChange.path);
+      const chunkSize = 20;
+
+      for (let i = 0; i < changes.files.length; i += chunkSize) {
+        const chunk = changes.files.slice(i, i + chunkSize);
         
-        if (await fs.pathExists(filePath)) {
-          state.files[fileChange.path] = {
-            exists: true,
-            content: await fs.readFile(filePath, 'utf8'),
-            stats: await fs.stat(filePath)
-          };
-        } else {
-          state.files[fileChange.path] = {
-            exists: false
-          };
+        const chunkResults = await Promise.all(chunk.map(async (fileChange) => {
+          const filePath = path.join(this.projectRoot, fileChange.path);
+          try {
+            // BOLT OPTIMIZATION: Consolidate file operations using concurrent readFile and stat calls
+            // wrapped in try-catch to handle ENOENT. This avoids a separate pathExists I/O operation.
+            const [content, stats] = await Promise.all([
+              fs.readFile(filePath, 'utf8'),
+              fs.stat(filePath)
+            ]);
+            return {
+              path: fileChange.path,
+              info: {
+                exists: true,
+                content,
+                stats
+              }
+            };
+          } catch (error) {
+            if (error.code === 'ENOENT') {
+              return {
+                path: fileChange.path,
+                info: { exists: false }
+              };
+            }
+            throw error;
+          }
+        }));
+
+        for (const result of chunkResults) {
+          state.files[result.path] = result.info;
         }
       }
     }
