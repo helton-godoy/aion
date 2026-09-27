@@ -304,16 +304,15 @@ class RollbackManager {
     
     if (changes.files && changes.files.length > 0) {
       state.files = {};
-      // Bolt Optimization: Use chunked concurrency (limit 20) and try/catch instead of sequential fs.pathExists
-      const chunkSize = 20;
-      const results = [];
+      const chunkSize = 20; // chunk to prevent EMFILE
 
       for (let i = 0; i < changes.files.length; i += chunkSize) {
         const chunk = changes.files.slice(i, i + chunkSize);
-        const chunkPromises = chunk.map(async (fileChange) => {
+        
+        // Optimistic concurrent reads instead of sequential pathExists
+        const results = await Promise.all(chunk.map(async (fileChange) => {
           const filePath = path.join(this.projectRoot, fileChange.path);
           try {
-            // Bolt Optimization: Run readFile and stat in parallel
             const [content, stats] = await Promise.all([
               fs.readFile(filePath, 'utf8'),
               fs.stat(filePath)
@@ -323,19 +322,17 @@ class RollbackManager {
               data: { exists: true, content, stats }
             };
           } catch (error) {
-            // Bolt Optimization: Catch ENOENT directly rather than a redundant fs.pathExists check
             if (error.code === 'ENOENT') {
               return { path: fileChange.path, data: { exists: false } };
             }
             throw error;
           }
-        });
-        results.push(...(await Promise.all(chunkPromises)));
-      }
+        }));
 
-      // Bolt Optimization: Populate state synchronously to ensure deterministic key order
-      for (const result of results) {
-        state.files[result.path] = result.data;
+        // Populate synchronously to ensure deterministic key order
+        for (const result of results) {
+          state.files[result.path] = result.data;
+        }
       }
     }
     

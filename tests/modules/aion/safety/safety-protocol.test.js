@@ -277,7 +277,8 @@ describe('SafetyProtocol Change Execution & Helper Classes', () => {
   describe('RollbackManager', () => {
     it('should create a rollback point', async () => {
       const changes = { files: [] };
-      // for captureCurrentState
+      // Not actually needed here since files is empty, but mock reject just in case
+      fs.readFile.mockRejectedValue(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }));
 
       const pointId = await safetyProtocol.rollbackManager.createPoint(changes);
 
