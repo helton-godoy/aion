@@ -1,0 +1,3 @@
+## 2024-06-29 - Optimize parallel file system I/O
+**Learning:** Checking `fs.pathExists` sequentially before performing parallel reads (`fs.readFile` and `fs.stat`) introduces unnecessary I/O blocking. Furthermore, trying to read many files in parallel using an unchunked `Promise.all` can risk hitting `EMFILE` limits and exhausting resources.
+**Action:** Replace `fs.pathExists` with direct `try/catch` handlers for `ENOENT` within file I/O operations, and use chunked `Promise.all` batches (e.g., chunks of 20) when capturing state or processing many files. This both speeds up throughput and guarantees safety under load.
