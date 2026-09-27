@@ -1,0 +1,3 @@
+## 2025-02-23 - Concurrent I/O Optimization in RollbackManager
+**Learning:** Checking `fs.pathExists` before `fs.readFile` is a performance anti-pattern. Native Node.js file system functions are faster when relying on try/catch blocks handling the `ENOENT` error. Additionally, sequential loops that await multiple I/O promises inside `captureCurrentState` caused unnecessary delays.
+**Action:** Replaced `fs.pathExists` checks with try/catch handling `ENOENT`. Used `Promise.all` for parallel reading of `fs.readFile` and `fs.stat`. Chunked parallel reads (size 20) to prevent EMFILE limits and excessive memory consumption during large file rollback scenarios.
