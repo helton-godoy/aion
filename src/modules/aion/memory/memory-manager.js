@@ -68,13 +68,13 @@ class MemoryManager {
    */
   async loadProductContext() {
     try {
-      if (await fs.pathExists(this.productContextPath)) {
-        const content = await fs.readFile(this.productContextPath, 'utf8');
-        return this.parseMarkdownContent(content);
-      }
-      return this.getDefaultProductContext();
+      // Optimization: Handle ENOENT natively instead of calling pathExists first
+      const content = await fs.readFile(this.productContextPath, 'utf8');
+      return this.parseMarkdownContent(content);
     } catch (error) {
-      console.warn(chalk.yellow(`⚠️  Could not load product context: ${error.message}`));
+      if (error.code !== 'ENOENT') {
+        console.warn(chalk.yellow(`⚠️  Could not load product context: ${error.message}`));
+      }
       return this.getDefaultProductContext();
     }
   }
@@ -84,13 +84,13 @@ class MemoryManager {
    */
   async loadActiveContext() {
     try {
-      if (await fs.pathExists(this.activeContextPath)) {
-        const content = await fs.readFile(this.activeContextPath, 'utf8');
-        return this.parseMarkdownContent(content);
-      }
-      return this.getDefaultActiveContext();
+      // Optimization: Handle ENOENT natively instead of calling pathExists first
+      const content = await fs.readFile(this.activeContextPath, 'utf8');
+      return this.parseMarkdownContent(content);
     } catch (error) {
-      console.warn(chalk.yellow(`⚠️  Could not load active context: ${error.message}`));
+      if (error.code !== 'ENOENT') {
+        console.warn(chalk.yellow(`⚠️  Could not load active context: ${error.message}`));
+      }
       return this.getDefaultActiveContext();
     }
   }
@@ -311,17 +311,24 @@ class MemoryManager {
   async getStatus() {
     const context = await this.getContext();
     
+    // Optimization: Fetch file stats concurrently and handle ENOENT natively
+    const [productStat, activeStat] = await Promise.all([
+      fs.stat(this.productContextPath).catch(err => err.code === 'ENOENT' ? { size: 0, exists: false } : { size: 0, exists: true }),
+      fs.stat(this.activeContextPath).catch(err => err.code === 'ENOENT' ? { size: 0, exists: false } : { size: 0, exists: true })
+    ]);
+
+    const productExists = productStat.exists !== false;
+    const activeExists = activeStat.exists !== false;
+
     return {
       productContext: {
-        exists: await fs.pathExists(this.productContextPath),
-        size: await fs.pathExists(this.productContextPath) ? 
-          (await fs.stat(this.productContextPath)).size : 0,
+        exists: productExists,
+        size: productStat.size,
         artifacts: context.product.artifacts?.length || 0
       },
       activeContext: {
-        exists: await fs.pathExists(this.activeContextPath),
-        size: await fs.pathExists(this.activeContextPath) ? 
-          (await fs.stat(this.activeContextPath)).size : 0,
+        exists: activeExists,
+        size: activeStat.size,
         activePersonas: Object.keys(context.active.personas || {}).length
       },
       totalArtifacts: context.combined.artifacts?.length || 0,
