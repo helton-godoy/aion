@@ -7,7 +7,7 @@
 const { program } = require('commander');
 const chalk = require('chalk');
 const figlet = require('figlet');
-const path = require('path');
+const pkg = require('../../package.json');
 const AIONInitializer = require('../aion/aion-init');
 const pkg = require('../../package.json');
 
