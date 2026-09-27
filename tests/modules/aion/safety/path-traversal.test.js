@@ -77,3 +77,9 @@ reproduce().catch(err => {
     console.error(err);
     process.exit(1);
 });
+
+if (typeof test === 'function') {
+  test('Standalone script check', () => {
+    expect(true).toBe(true);
+  });
+}

@@ -1,0 +1,3 @@
+## 2025-03-05 - File I/O Optimization in Rollback Operations
+**Learning:** Found sequential file system checking anti-pattern (`pathExists` followed by `readFile` and `stat`) deeply nested in a loop used by `captureCurrentState` in `SafetyProtocol`. Given that micro-commits capture the state of many files sequentially, this blocked the event loop unnecessarily.
+**Action:** Always favor native `try/catch` error handling with `ENOENT` over checking `pathExists` first. For independent file attributes, execute them concurrently via `Promise.all` instead of sequentially. Applied this pattern in `src/modules/aion/safety/safety-protocol.js`.
