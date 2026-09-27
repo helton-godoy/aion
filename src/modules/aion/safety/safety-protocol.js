@@ -202,12 +202,15 @@ class SafetyProtocol {
     const trackerPath = path.join(this.projectRoot, '.aion', 'commit-tracker.json');
     
     try {
-      if (await fs.pathExists(trackerPath)) {
-        this.commitTracker = await fs.readJSON(trackerPath);
-      }
+      // BOLT OPTIMIZATION: Avoid redundant fs.pathExists check, rely on try/catch to handle ENOENT directly
+      this.commitTracker = await fs.readJSON(trackerPath);
     } catch (error) {
-      console.warn(chalk.yellow(`⚠️  Could not load commit tracker: ${error.message}`));
-      this.commitTracker = [];
+      if (error.code === 'ENOENT') {
+        this.commitTracker = [];
+      } else {
+        console.warn(chalk.yellow(`⚠️  Could not load commit tracker: ${error.message}`));
+        this.commitTracker = [];
+      }
     }
   }
 
@@ -278,11 +281,16 @@ class RollbackManager {
     
     const pointPath = path.join(this.rollbackPointsPath, `${commit.rollbackPoint}.json`);
     
-    if (!(await fs.pathExists(pointPath))) {
-      throw new Error(`Rollback point ${commit.rollbackPoint} not found`);
+    let rollbackPoint;
+    try {
+      // BOLT OPTIMIZATION: Avoid redundant fs.pathExists check, rely on try/catch to handle ENOENT directly
+      rollbackPoint = await fs.readJSON(pointPath);
+    } catch (error) {
+      if (error.code === 'ENOENT') {
+        throw new Error(`Rollback point ${commit.rollbackPoint} not found`);
+      }
+      throw error;
     }
-    
-    const rollbackPoint = await fs.readJSON(pointPath);
     
     // Restore state
     await this.restoreState(rollbackPoint.state);
@@ -298,19 +306,44 @@ class RollbackManager {
     
     if (changes.files) {
       state.files = {};
-      for (const fileChange of changes.files) {
-        const filePath = path.join(this.projectRoot, fileChange.path);
+      // BOLT OPTIMIZATION: Process files in chunks using Promise.all to avoid EMFILE errors
+      // and parallelize I/O operations (fs.readFile and fs.stat) instead of sequential execution.
+      // Also avoiding redundant fs.pathExists checks, instead relying on try/catch to handle ENOENT directly.
+      const chunkSize = 20;
+      for (let i = 0; i < changes.files.length; i += chunkSize) {
+        const chunk = changes.files.slice(i, i + chunkSize);
         
-        if (await fs.pathExists(filePath)) {
-          state.files[fileChange.path] = {
-            exists: true,
-            content: await fs.readFile(filePath, 'utf8'),
-            stats: await fs.stat(filePath)
-          };
-        } else {
-          state.files[fileChange.path] = {
-            exists: false
-          };
+        const chunkResults = await Promise.all(chunk.map(async (fileChange) => {
+          const filePath = path.join(this.projectRoot, fileChange.path);
+          try {
+            const [content, stats] = await Promise.all([
+              fs.readFile(filePath, 'utf8'),
+              fs.stat(filePath)
+            ]);
+            return {
+              path: fileChange.path,
+              data: {
+                exists: true,
+                content,
+                stats
+              }
+            };
+          } catch (error) {
+            if (error.code === 'ENOENT') {
+              return {
+                path: fileChange.path,
+                data: {
+                  exists: false
+                }
+              };
+            }
+            throw error;
+          }
+        }));
+
+        // Synchronously populate state.files to ensure deterministic order
+        for (const result of chunkResults) {
+          state.files[result.path] = result.data;
         }
       }
     }
