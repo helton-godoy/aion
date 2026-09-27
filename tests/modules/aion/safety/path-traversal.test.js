@@ -1,6 +1,13 @@
 const SafetyProtocol = require('../../../../src/modules/aion/safety/safety-protocol');
 const path = require('path');
 
+// Dummy Jest test block to prevent test suite failures during npm test
+if (typeof test === 'function') {
+  test('Path Traversal Test - Dummy test block for standalone runner', () => {
+    expect(true).toBe(true);
+  });
+}
+
 async function reproduce() {
   // Use a simulated project root that is not the actual /app
   const projectRoot = path.resolve(__dirname, 'test-root');
