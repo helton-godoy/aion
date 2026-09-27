@@ -182,7 +182,10 @@ describe('SafetyProtocol State Management & Utilities', () => {
     });
 
     it('should initialize empty if file does not exist', async () => {
-      fs.readJSON.mockRejectedValue(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }));
+      const enoentError = new Error('ENOENT');
+      enoentError.code = 'ENOENT';
+      fs.readJSON.mockRejectedValue(enoentError);
+
       await safetyProtocol.loadCommitTracker();
       expect(safetyProtocol.commitTracker).toEqual([]);
     });
@@ -284,9 +287,26 @@ describe('SafetyProtocol Change Execution & Helper Classes', () => {
     });
 
     it('should capture current state during createPoint', async () => {
-      const changes = { files: [{ path: 'existing.js' }] };
-      fs.readFile.mockResolvedValue('old content');
-      fs.stat.mockResolvedValue({ size: 100 });
+      const changes = { files: [{ path: 'existing.js' }, { path: 'missing.js' }] };
+
+      // Simulate file reads. The first resolves, the second rejects with ENOENT.
+      fs.readFile.mockImplementation(async (filePath) => {
+        if (filePath.includes('missing.js')) {
+          const err = new Error('ENOENT');
+          err.code = 'ENOENT';
+          throw err;
+        }
+        return 'old content';
+      });
+
+      fs.stat.mockImplementation(async (filePath) => {
+        if (filePath.includes('missing.js')) {
+          const err = new Error('ENOENT');
+          err.code = 'ENOENT';
+          throw err;
+        }
+        return { size: 100 };
+      });
 
       const pointId = await safetyProtocol.rollbackManager.createPoint(changes);
 
@@ -296,6 +316,9 @@ describe('SafetyProtocol Change Execution & Helper Classes', () => {
         exists: true,
         content: 'old content',
         stats: { size: 100 }
+      });
+      expect(savedPoint.state.files['missing.js']).toEqual({
+        exists: false
       });
     });
 
@@ -317,7 +340,23 @@ describe('SafetyProtocol Change Execution & Helper Classes', () => {
       expect(fs.writeFile).toHaveBeenCalledWith(expect.stringContaining('file1.js'), 'restored', 'utf8');
       expect(fs.remove).toHaveBeenCalledWith(expect.stringContaining('file2.js'));
     });
+
+    it('should throw if rollback point not found', async () => {
+      const commit = { rollbackPoint: 'rb-not-found' };
+      fs.readJSON.mockRejectedValue(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }));
+
+      await expect(safetyProtocol.rollbackManager.rollback(commit)).rejects.toThrow('Rollback point rb-not-found not found');
+    });
   });
+
+
+    it('should throw error when rollback point file is missing', async () => {
+      const commit = { rollbackPoint: 'missing-rb' };
+      fs.readJSON.mockRejectedValue(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }));
+
+      await expect(safetyProtocol.rollbackManager.rollback(commit))
+        .rejects.toThrow('Rollback point missing-rb not found');
+    });
 
   describe('Validators', () => {
     it('FileValidator should detect path traversal', async () => {
