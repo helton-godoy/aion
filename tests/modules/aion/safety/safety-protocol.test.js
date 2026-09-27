@@ -90,6 +90,20 @@ describe('SafetyProtocol Core', () => {
       await expect(safetyProtocol.rollback('non-existent'))
         .rejects.toThrow('Commit non-existent not found');
     });
+
+    it('should throw error when rollbackManager.rollback fails for found commit', async () => {
+      const commit = {
+        id: 'test-id',
+        status: 'committed',
+        rollbackPoint: 'invalid-rb-point'
+      };
+      safetyProtocol.commitTracker = [commit];
+
+      const error = new Error('Rollback execution failed');
+      jest.spyOn(safetyProtocol.rollbackManager, 'rollback').mockRejectedValue(error);
+
+      await expect(safetyProtocol.rollback('test-id')).rejects.toThrow('Rollback execution failed');
+    });
   });
 });
 
