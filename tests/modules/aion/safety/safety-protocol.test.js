@@ -333,7 +333,6 @@ describe('SafetyProtocol Change Execution & Helper Classes', () => {
         }
       };
 
-      fs.pathExists.mockResolvedValue(true);
       fs.readJSON.mockResolvedValue(rbPoint);
 
       await safetyProtocol.rollbackManager.rollback(commit);
@@ -341,7 +340,23 @@ describe('SafetyProtocol Change Execution & Helper Classes', () => {
       expect(fs.writeFile).toHaveBeenCalledWith(expect.stringContaining('file1.js'), 'restored', 'utf8');
       expect(fs.remove).toHaveBeenCalledWith(expect.stringContaining('file2.js'));
     });
+
+    it('should throw if rollback point not found', async () => {
+      const commit = { rollbackPoint: 'rb-not-found' };
+      fs.readJSON.mockRejectedValue(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }));
+
+      await expect(safetyProtocol.rollbackManager.rollback(commit)).rejects.toThrow('Rollback point rb-not-found not found');
+    });
   });
+
+
+    it('should throw error when rollback point file is missing', async () => {
+      const commit = { rollbackPoint: 'missing-rb' };
+      fs.readJSON.mockRejectedValue(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }));
+
+      await expect(safetyProtocol.rollbackManager.rollback(commit))
+        .rejects.toThrow('Rollback point missing-rb not found');
+    });
 
   describe('Validators', () => {
     it('FileValidator should detect path traversal', async () => {
