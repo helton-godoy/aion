@@ -68,12 +68,12 @@ class MemoryManager {
    */
   async loadProductContext() {
     try {
-      if (await fs.pathExists(this.productContextPath)) {
-        const content = await fs.readFile(this.productContextPath, 'utf8');
-        return this.parseMarkdownContent(content);
-      }
-      return this.getDefaultProductContext();
+      const content = await fs.readFile(this.productContextPath, 'utf8');
+      return this.parseMarkdownContent(content);
     } catch (error) {
+      if (error.code === 'ENOENT') {
+        return this.getDefaultProductContext();
+      }
       console.warn(chalk.yellow(`⚠️  Could not load product context: ${error.message}`));
       return this.getDefaultProductContext();
     }
@@ -84,12 +84,12 @@ class MemoryManager {
    */
   async loadActiveContext() {
     try {
-      if (await fs.pathExists(this.activeContextPath)) {
-        const content = await fs.readFile(this.activeContextPath, 'utf8');
-        return this.parseMarkdownContent(content);
-      }
-      return this.getDefaultActiveContext();
+      const content = await fs.readFile(this.activeContextPath, 'utf8');
+      return this.parseMarkdownContent(content);
     } catch (error) {
+      if (error.code === 'ENOENT') {
+        return this.getDefaultActiveContext();
+      }
       console.warn(chalk.yellow(`⚠️  Could not load active context: ${error.message}`));
       return this.getDefaultActiveContext();
     }
@@ -309,19 +309,31 @@ class MemoryManager {
    * Get memory bank status
    */
   async getStatus() {
-    const context = await this.getContext();
+    const contextPromise = this.getContext();
+    const productStatPromise = fs.stat(this.productContextPath).catch(e => {
+        if (e.code === 'ENOENT') return null;
+        throw e;
+    });
+    const activeStatPromise = fs.stat(this.activeContextPath).catch(e => {
+        if (e.code === 'ENOENT') return null;
+        throw e;
+    });
+
+    const [context, productStat, activeStat] = await Promise.all([
+      contextPromise,
+      productStatPromise,
+      activeStatPromise
+    ]);
     
     return {
       productContext: {
-        exists: await fs.pathExists(this.productContextPath),
-        size: await fs.pathExists(this.productContextPath) ? 
-          (await fs.stat(this.productContextPath)).size : 0,
+        exists: !!productStat,
+        size: productStat ? productStat.size : 0,
         artifacts: context.product.artifacts?.length || 0
       },
       activeContext: {
-        exists: await fs.pathExists(this.activeContextPath),
-        size: await fs.pathExists(this.activeContextPath) ? 
-          (await fs.stat(this.activeContextPath)).size : 0,
+        exists: !!activeStat,
+        size: activeStat ? activeStat.size : 0,
         activePersonas: Object.keys(context.active.personas || {}).length
       },
       totalArtifacts: context.combined.artifacts?.length || 0,

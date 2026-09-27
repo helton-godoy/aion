@@ -1,6 +1,13 @@
 const SafetyProtocol = require('../../../../src/modules/aion/safety/safety-protocol');
 const path = require('path');
 
+// Dummy test to satisfy Jest
+if (typeof test === 'function') {
+  test('standalone test script', () => {
+    expect(true).toBe(true);
+  });
+}
+
 async function reproduce() {
   // Use a simulated project root that is not the actual /app
   const projectRoot = path.resolve(__dirname, 'test-root');

@@ -1,0 +1,3 @@
+## 2024-05-18 - Avoid fs.pathExists before read
+**Learning:** Checking `fs.pathExists` before performing an operation like `fs.readFile` or `fs.readJSON` introduces an unnecessary file system call, creating a minor performance bottleneck via redundant disk I/O. Furthermore, performing multiple independent file system operations sequentially block the event loop needlessly.
+**Action:** Instead of `fs.pathExists`, rely on a `try/catch` block handling the `ENOENT` error to avoid the extra stat check. When performing multiple distinct file checks/reads simultaneously, use `Promise.all` to execute the file system reads concurrently.
