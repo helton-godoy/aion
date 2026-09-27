@@ -298,20 +298,47 @@ class RollbackManager {
     
     if (changes.files) {
       state.files = {};
-      for (const fileChange of changes.files) {
-        const filePath = path.join(this.projectRoot, fileChange.path);
+
+      // BOLT OPTIMIZATION: Process reads in parallel chunks to prevent EMFILE and avoid redundant pathExists
+      const fileChanges = changes.files;
+      const results = [];
+      const CHUNK_SIZE = 20;
+
+      for (let i = 0; i < fileChanges.length; i += CHUNK_SIZE) {
+        const chunk = fileChanges.slice(i, i + CHUNK_SIZE);
         
-        if (await fs.pathExists(filePath)) {
-          state.files[fileChange.path] = {
-            exists: true,
-            content: await fs.readFile(filePath, 'utf8'),
-            stats: await fs.stat(filePath)
-          };
-        } else {
-          state.files[fileChange.path] = {
-            exists: false
-          };
-        }
+        const chunkPromises = chunk.map(async (fileChange) => {
+          const filePath = path.join(this.projectRoot, fileChange.path);
+
+          try {
+            // Execute readFile and stat concurrently
+            const [content, stats] = await Promise.all([
+              fs.readFile(filePath, 'utf8'),
+              fs.stat(filePath)
+            ]);
+
+            return {
+              path: fileChange.path,
+              data: { exists: true, content, stats }
+            };
+          } catch (error) {
+            if (error.code === 'ENOENT') {
+              return {
+                path: fileChange.path,
+                data: { exists: false }
+              };
+            }
+            throw error;
+          }
+        });
+
+        const chunkResults = await Promise.all(chunkPromises);
+        results.push(...chunkResults);
+      }
+
+      // Populate state deterministically
+      for (const result of results) {
+        state.files[result.path] = result.data;
       }
     }
     
