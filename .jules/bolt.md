@@ -1,0 +1,3 @@
+## 2025-04-03 - [Optimize Disk I/O]
+**Learning:** Checking `fs.pathExists` before `fs.readFile` or `fs.stat` is an anti-pattern that doubles the amount of synchronous/sequential disk operations, causing a major bottleneck when performing multiple file system operations.
+**Action:** Instead, rely directly on `fs.readFile` or `fs.stat` and implement a `try/catch` block that natively handles the `ENOENT` (Error NO ENTry) condition. Furthermore, use `Promise.all` to fetch file statistics concurrently to parallelize I/O rather than awaiting them sequentially.
