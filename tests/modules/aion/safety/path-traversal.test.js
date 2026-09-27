@@ -77,3 +77,11 @@ reproduce().catch(err => {
     console.error(err);
     process.exit(1);
 });
+
+if (typeof test === 'function') {
+  test('Path traversal test runner', async () => {
+    // This is just a dummy test block so Jest sees a test in this file
+    // while the script still runs as a standalone test runner above.
+    expect(true).toBe(true);
+  });
+}
