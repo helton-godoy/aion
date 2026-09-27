@@ -298,20 +298,28 @@ class RollbackManager {
     
     if (changes.files) {
       state.files = {};
-      for (const fileChange of changes.files) {
+
+      // BOLT OPTIMIZATION: Process file states concurrently and eliminate redundant pathExists check.
+      // Use Promise.all to fetch file content and stats in parallel, catching ENOENT directly.
+      const filePromises = changes.files.map(async (fileChange) => {
         const filePath = path.join(this.projectRoot, fileChange.path);
-        
-        if (await fs.pathExists(filePath)) {
-          state.files[fileChange.path] = {
-            exists: true,
-            content: await fs.readFile(filePath, 'utf8'),
-            stats: await fs.stat(filePath)
-          };
-        } else {
-          state.files[fileChange.path] = {
-            exists: false
-          };
+        try {
+          const [content, stats] = await Promise.all([
+            fs.readFile(filePath, 'utf8'),
+            fs.stat(filePath)
+          ]);
+          return { path: fileChange.path, data: { exists: true, content, stats } };
+        } catch (error) {
+          if (error.code === 'ENOENT') {
+            return { path: fileChange.path, data: { exists: false } };
+          }
+          throw error;
         }
+      });
+
+      const results = await Promise.all(filePromises);
+      for (const result of results) {
+        state.files[result.path] = result.data;
       }
     }
     
