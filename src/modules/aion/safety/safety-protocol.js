@@ -298,21 +298,33 @@ class RollbackManager {
     
     if (changes.files) {
       state.files = {};
-      for (const fileChange of changes.files) {
+
+      // BOLT OPTIMIZATION: Process files in parallel and avoid redundant pathExists checks
+      await Promise.all(changes.files.map(async (fileChange) => {
         const filePath = path.join(this.projectRoot, fileChange.path);
         
-        if (await fs.pathExists(filePath)) {
+        try {
+          // Attempt to read file and get stats in parallel
+          const [content, stats] = await Promise.all([
+            fs.readFile(filePath, 'utf8'),
+            fs.stat(filePath)
+          ]);
+
           state.files[fileChange.path] = {
             exists: true,
-            content: await fs.readFile(filePath, 'utf8'),
-            stats: await fs.stat(filePath)
+            content,
+            stats
           };
-        } else {
-          state.files[fileChange.path] = {
-            exists: false
-          };
+        } catch (error) {
+          if (error.code === 'ENOENT') {
+            state.files[fileChange.path] = {
+              exists: false
+            };
+          } else {
+            throw error; // Rethrow unexpected errors (e.g. permission denied)
+          }
         }
-      }
+      }));
     }
     
     return state;
