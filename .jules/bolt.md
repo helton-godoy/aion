@@ -1,3 +1,3 @@
-## 2025-02-28 - Optimize Concurrent File System Reads by Handling ENOENT
-**Learning:** Checking for file existence (`fs.pathExists` or `fs.existsSync`) immediately before reading the file (`fs.readFile`) or getting its stats (`fs.stat`) introduces redundant disk I/O operations and race conditions.
-**Action:** Consolidate the checks by simply attempting to execute `fs.readFile` and `fs.stat` concurrently utilizing `Promise.all()`, and handle any missing file conditions by gracefully catching the `ENOENT` error. Additionally, when dealing with arrays of files, chunk the operations to avoid hitting system EMFILE (too many open files) limits.
+## 2025-03-01 - Avoid Double I/O and EMFILE in Bulk File Operations
+**Learning:** Checking `fs.pathExists` before `fs.readFile` and `fs.stat` doubles disk I/O. Bulk processing without concurrency controls risks EMFILE errors.
+**Action:** Use chunked `Promise.all` (e.g., limit 20) and `try/catch` `ENOENT` to optimize bulk concurrent file reading.

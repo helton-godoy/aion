@@ -84,17 +84,15 @@ async function reproduce() {
   }
 }
 
-// Ensure Jest does not fail when running this file directly or in test suite
-if (typeof test === 'function') {
-  test('path traversal security checks are implemented correctly', () => {
-    expect(true).toBe(true);
-  });
-}
+reproduce().catch(err => {
+    console.error(err);
+    process.exit(1);
+});
 
-// Only run the reproduction logic when executed directly
-if (require.main === module) {
-  reproduce().catch(err => {
-      console.error(err);
-      process.exit(1);
+if (typeof test === 'function') {
+  test('Path traversal test runner', async () => {
+    // This is just a dummy test block so Jest sees a test in this file
+    // while the script still runs as a standalone test runner above.
+    expect(true).toBe(true);
   });
 }
