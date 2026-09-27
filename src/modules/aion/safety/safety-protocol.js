@@ -304,7 +304,7 @@ class RollbackManager {
   async captureCurrentState(changes) {
     const state = {};
     
-    if (changes.files) {
+    if (changes.files && changes.files.length > 0) {
       state.files = {};
       // BOLT OPTIMIZATION: Process files in chunks using Promise.all to avoid EMFILE errors
       // and parallelize I/O operations (fs.readFile and fs.stat) instead of sequential execution.
