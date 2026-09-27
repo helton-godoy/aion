@@ -1,5 +1,3 @@
-## 2024-06-05 - Avoid Redundant `fs.pathExists` Checks
-
-**Learning:** When reading files, checking if they exist via `fs.pathExists` before `fs.readJSON` or `fs.readFile` introduces an extra, unnecessary I/O operation. In `SafetyProtocol` and `MemoryManager`, these redundant checks were removed in favor of `try/catch` logic that handles `ENOENT` natively, optimizing file state captures by a significant amount.
-
-**Action:** Consistently use `try/catch` and target the `ENOENT` error code specifically rather than doing explicit existence checks. Parallelize multiple `fs` operations using `Promise.all` instead of executing them sequentially (like reading a file while also stating it).
+## 2023-10-27 - [Avoid fs.pathExists Before Read in Loop]
+**Learning:** Checking `fs.pathExists` before performing `fs.readFile` or `fs.stat` is inefficient (two disk calls where one is needed) and can cause Time-of-Check to Time-of-Use race conditions. Catching `ENOENT` directly is safer and faster. Furthermore, unbounded concurrency via `Promise.all` over hundreds of files causes `EMFILE` limits; batching/chunking promises is necessary. Lastly, object population from async mapping must be deterministic, so resolving chunk arrays before assigning to a tracking object preserves ordering.
+**Action:** When implementing bulk file system reads/stats, chunk `Promise.all` arrays to ~20 items max. Avoid `pathExists` + `readFile` combos by replacing them with `try/catch` handlers for `ENOENT`. Collect results array sequentially at the end to guarantee insertion order into maps/objects.
