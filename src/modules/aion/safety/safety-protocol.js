@@ -202,12 +202,15 @@ class SafetyProtocol {
     const trackerPath = path.join(this.projectRoot, '.aion', 'commit-tracker.json');
     
     try {
-      if (await fs.pathExists(trackerPath)) {
-        this.commitTracker = await fs.readJSON(trackerPath);
-      }
+      // ⚡ Bolt: Optimize I/O by removing redundant pathExists check before readJSON.
+      this.commitTracker = await fs.readJSON(trackerPath);
     } catch (error) {
-      console.warn(chalk.yellow(`⚠️  Could not load commit tracker: ${error.message}`));
-      this.commitTracker = [];
+      if (error.code === 'ENOENT') {
+        this.commitTracker = [];
+      } else {
+        console.warn(chalk.yellow(`⚠️  Could not load commit tracker: ${error.message}`));
+        this.commitTracker = [];
+      }
     }
   }
 
@@ -298,19 +301,30 @@ class RollbackManager {
     
     if (changes.files) {
       state.files = {};
-      for (const fileChange of changes.files) {
-        const filePath = path.join(this.projectRoot, fileChange.path);
+      // ⚡ Bolt: Optimize I/O by chunking concurrent operations (prevent EMFILE),
+      // parallelizing read/stat, and avoiding redundant pathExists checks.
+      const CHUNK_SIZE = 20;
+      for (let i = 0; i < changes.files.length; i += CHUNK_SIZE) {
+        const chunk = changes.files.slice(i, i + CHUNK_SIZE);
         
-        if (await fs.pathExists(filePath)) {
-          state.files[fileChange.path] = {
-            exists: true,
-            content: await fs.readFile(filePath, 'utf8'),
-            stats: await fs.stat(filePath)
-          };
-        } else {
-          state.files[fileChange.path] = {
-            exists: false
-          };
+        const results = await Promise.all(chunk.map(async (fileChange) => {
+          const filePath = path.join(this.projectRoot, fileChange.path);
+          try {
+            const [content, stats] = await Promise.all([
+              fs.readFile(filePath, 'utf8'),
+              fs.stat(filePath)
+            ]);
+            return { path: fileChange.path, info: { exists: true, content, stats } };
+          } catch (error) {
+            if (error.code === 'ENOENT') {
+              return { path: fileChange.path, info: { exists: false } };
+            }
+            throw error;
+          }
+        }));
+
+        for (const { path, info } of results) {
+          state.files[path] = info;
         }
       }
     }

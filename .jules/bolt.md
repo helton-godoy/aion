@@ -1,0 +1,3 @@
+## 2024-06-11 - I/O Optimization in RollbackManager
+**Learning:** Found a classic Time-of-Check to Time-of-Use (TOCTOU) anti-pattern in Node.js fs operations using `fs-extra`'s `fs.pathExists` right before `fs.readFile` and `fs.stat`, causing redundant disk I/O. Also discovered sequential `for...of` loops for asynchronous file processing become bottlenecks when multiple files are handled.
+**Action:** Always prefer `try/catch` with `ENOENT` error handling over `pathExists` checks for optimal I/O. When optimizing loops, chunk concurrent `Promise.all` operations (e.g., limit 20) instead of using unbounded concurrency to avoid `EMFILE` errors. Ensure tests mock `ENOENT` rejection accurately rather than mocking `pathExists`.
