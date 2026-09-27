@@ -1,0 +1,3 @@
+## 2024-05-10 - File System Race Conditions and Double I/O
+**Learning:** Checking `fs.pathExists` before performing `fs.readFile` or `fs.stat` is not only inefficient (double I/O operations) but also creates race conditions where a file might be modified or deleted between the check and the read operation. When capturing rollback states across many files in an array, resolving them sequentially via `for...of` compounds the performance bottleneck significantly.
+**Action:** Always prefer handling `ENOENT` natively inside a `try/catch` block for existence checks. Process independent file operations concurrently utilizing `Promise.all` instead of sequential loops.
