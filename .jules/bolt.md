@@ -1,3 +1,3 @@
-## 2024-05-24 - fs.pathExists Bottleneck
-**Learning:** Checking `fs.pathExists` right before `fs.readFile` and `fs.stat` adds unnecessary sequential I/O overhead. Node.js native errors already catch `ENOENT` (file not found).
-**Action:** Remove `fs.pathExists` checks before `fs.readFile`/`fs.stat` and use try/catch on `ENOENT` natively to boost performance.
+## 2026-06-14 - Safety Protocol File Operations Bottleneck
+**Learning:** Sequential fs operations and redundant fs.pathExists checks (Look Before You Leap) prior to reading/stating files can create a major I/O bottleneck in core infrastructure like SafetyProtocol. Furthermore, sequential processing of file arrays without chunking can hit EMFILE limits. Catching ENOENT natively (Easier to Ask for Forgiveness than Permission) is significantly faster.
+**Action:** When performing disk operations in Node.js, prefer relying on native try/catch blocks for ENOENT errors instead of path existence checks. Additionally, use Promise.all to parallelize independent operations (e.g., readFile and stat) while employing chunking (e.g., chunks of 20) to prevent EMFILE crashes.

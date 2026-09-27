@@ -275,9 +275,6 @@ describe('SafetyProtocol Change Execution & Helper Classes', () => {
   describe('RollbackManager', () => {
     it('should create a rollback point', async () => {
       const changes = { files: [] };
-      const enoentError = Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
-      fs.readFile.mockRejectedValue(enoentError);
-      fs.stat.mockRejectedValue(enoentError); // for captureCurrentState
 
       const pointId = await safetyProtocol.rollbackManager.createPoint(changes);
 
@@ -319,6 +316,20 @@ describe('SafetyProtocol Change Execution & Helper Classes', () => {
       });
     });
 
+    it('should handle ENOENT when capturing current state', async () => {
+      const changes = { files: [{ path: 'missing.js' }] };
+      fs.readFile.mockRejectedValue(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }));
+      fs.stat.mockRejectedValue(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }));
+
+      const pointId = await safetyProtocol.rollbackManager.createPoint(changes);
+
+      const callArgs = fs.writeJSON.mock.calls[0];
+      const savedPoint = callArgs[1];
+      expect(savedPoint.state.files['missing.js']).toEqual({
+        exists: false
+      });
+    });
+
     it('should rollback by restoring state', async () => {
       const commit = { rollbackPoint: 'rb-1' };
       const rbPoint = {
@@ -338,12 +349,12 @@ describe('SafetyProtocol Change Execution & Helper Classes', () => {
       expect(fs.remove).toHaveBeenCalledWith(expect.stringContaining('file2.js'));
     });
 
-    it('should throw error when rollback point is not found', async () => {
-      const commit = { rollbackPoint: 'rb-missing' };
+    it('should throw "not found" error when rollback point is missing', async () => {
+      const commit = { rollbackPoint: 'missing-rb' };
       fs.readJSON.mockRejectedValue(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }));
 
       await expect(safetyProtocol.rollbackManager.rollback(commit))
-        .rejects.toThrow('Rollback point rb-missing not found');
+        .rejects.toThrow('Rollback point missing-rb not found');
     });
   });
 

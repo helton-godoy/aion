@@ -77,4 +77,10 @@ reproduce().catch(err => {
     console.error(err);
     process.exit(1);
 });
-if (typeof test === 'function') { test('dummy test', () => { expect(true).toBe(true); }); }
+
+// Dummy Jest test to prevent suite failure
+if (typeof test === 'function') {
+  test('standalone test script', () => {
+    expect(true).toBe(true);
+  });
+}
