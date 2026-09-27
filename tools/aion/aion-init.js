@@ -72,8 +72,11 @@ class AIONInitializer {
   }
 
   async isInitialized() {
-    return fs.existsSync(path.join(this.aionPath, 'package.json')) &&
-           fs.existsSync(path.join(this.aionPath, 'src/modules/aion'));
+    const [pkgExists, moduleExists] = await Promise.all([
+      fs.pathExists(path.join(this.aionPath, 'package.json')),
+      fs.pathExists(path.join(this.aionPath, 'src/modules/aion'))
+    ]);
+    return pkgExists && moduleExists;
   }
 
   async setupBMADFoundation() {
