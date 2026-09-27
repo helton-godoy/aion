@@ -1,0 +1,3 @@
+## 2024-04-25 - Removing Redundant Path Checks and Parallelizing Disk I/O
+**Learning:** Checking for file existence (`fs.pathExists`) immediately prior to reading (`fs.readFile`) or querying stats (`fs.stat`) introduces unnecessary sequential disk I/O operations and race conditions. Furthermore, when querying metadata for multiple, independent files, sequentially awaiting operations severely delays execution.
+**Action:** Remove preemptive `fs.pathExists` checks. Attempt to execute the primary file system operation natively, handling the resulting `ENOENT` error in a `try/catch` or `.catch()` block. For multiple independent file operations, always wrap them in `Promise.all` to perform parallel disk access.
