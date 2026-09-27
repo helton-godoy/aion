@@ -298,19 +298,45 @@ class RollbackManager {
     
     if (changes.files) {
       state.files = {};
-      for (const fileChange of changes.files) {
-        const filePath = path.join(this.projectRoot, fileChange.path);
-        
-        if (await fs.pathExists(filePath)) {
-          state.files[fileChange.path] = {
-            exists: true,
-            content: await fs.readFile(filePath, 'utf8'),
-            stats: await fs.stat(filePath)
-          };
-        } else {
-          state.files[fileChange.path] = {
-            exists: false
-          };
+      // BOLT OPTIMIZATION: Process files in parallel chunks of 20 to avoid EMFILE errors
+      const chunks = [];
+      const chunkSize = 20;
+      for (let i = 0; i < changes.files.length; i += chunkSize) {
+        chunks.push(changes.files.slice(i, i + chunkSize));
+      }
+
+      for (const chunk of chunks) {
+        // BOLT OPTIMIZATION: Process chunk concurrently and collect results before updating state to maintain deterministic order
+        const results = await Promise.all(chunk.map(async (fileChange) => {
+          const filePath = path.join(this.projectRoot, fileChange.path);
+          try {
+            // BOLT OPTIMIZATION: Avoid double I/O (fs.pathExists + fs.readFile/stat).
+            // Run readFile and stat in parallel and handle ENOENT natively.
+            const [content, stats] = await Promise.all([
+              fs.readFile(filePath, 'utf8'),
+              fs.stat(filePath)
+            ]);
+            return {
+              path: fileChange.path,
+              data: {
+                exists: true,
+                content,
+                stats
+              }
+            };
+          } catch (error) {
+            if (error.code === 'ENOENT') {
+              return {
+                path: fileChange.path,
+                data: { exists: false }
+              };
+            }
+            throw error;
+          }
+        }));
+
+        for (const result of results) {
+          state.files[result.path] = result.data;
         }
       }
     }
