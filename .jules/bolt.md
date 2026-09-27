@@ -1,3 +1,3 @@
-## 2025-06-13 - Parallelize File Data Capture during Rollbacks
-**Learning:** In `SafetyProtocol`'s `captureCurrentState`, using `Promise.all` concurrently mapped across `changes.files` for reading `fs.readFile` and `fs.stat` while handling `ENOENT` natively eliminates redundant `fs.pathExists` checks and unblocks sequential looping.
-**Action:** Always favor native error handling of standard POSIX signals like `ENOENT` over explicit `fs.pathExists` to avoid duplicate file system I/O, and remember to batch mapping operations with `Promise.all` when chronological ordering isn't strictly required.
+## 2024-06-11 - I/O Optimization in RollbackManager
+**Learning:** Found a classic Time-of-Check to Time-of-Use (TOCTOU) anti-pattern in Node.js fs operations using `fs-extra`'s `fs.pathExists` right before `fs.readFile` and `fs.stat`, causing redundant disk I/O. Also discovered sequential `for...of` loops for asynchronous file processing become bottlenecks when multiple files are handled.
+**Action:** Always prefer `try/catch` with `ENOENT` error handling over `pathExists` checks for optimal I/O. When optimizing loops, chunk concurrent `Promise.all` operations (e.g., limit 20) instead of using unbounded concurrency to avoid `EMFILE` errors. Ensure tests mock `ENOENT` rejection accurately rather than mocking `pathExists`.

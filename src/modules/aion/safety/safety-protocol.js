@@ -202,7 +202,7 @@ class SafetyProtocol {
     const trackerPath = path.join(this.projectRoot, '.aion', 'commit-tracker.json');
     
     try {
-      // BOLT OPTIMIZATION: Avoid redundant fs.pathExists check, rely on try/catch to handle ENOENT directly
+      // ⚡ Bolt: Optimize I/O by removing redundant pathExists check before readJSON.
       this.commitTracker = await fs.readJSON(trackerPath);
     } catch (error) {
       if (error.code === 'ENOENT') {
@@ -306,27 +306,30 @@ class RollbackManager {
     
     if (changes.files && changes.files.length > 0) {
       state.files = {};
-
-      // BOLT OPTIMIZATION: Concurrently read file and stats, and catch ENOENT to avoid redundant fs.pathExists check.
-      const captureFile = async (fileChange) => {
-        const filePath = path.join(this.projectRoot, fileChange.path);
-        try {
-          const [content, stats] = await Promise.all([
-            fs.readFile(filePath, 'utf8'),
-            fs.stat(filePath)
-          ]);
-          return {
-            path: fileChange.path,
-            info: { exists: true, content, stats }
-          };
-        } catch (error) {
-          if (error.code === 'ENOENT') {
-            return {
-              path: fileChange.path,
-              info: { exists: false }
-            };
+      // ⚡ Bolt: Optimize I/O by chunking concurrent operations (prevent EMFILE),
+      // parallelizing read/stat, and avoiding redundant pathExists checks.
+      const CHUNK_SIZE = 20;
+      for (let i = 0; i < changes.files.length; i += CHUNK_SIZE) {
+        const chunk = changes.files.slice(i, i + CHUNK_SIZE);
+        
+        const results = await Promise.all(chunk.map(async (fileChange) => {
+          const filePath = path.join(this.projectRoot, fileChange.path);
+          try {
+            const [content, stats] = await Promise.all([
+              fs.readFile(filePath, 'utf8'),
+              fs.stat(filePath)
+            ]);
+            return { path: fileChange.path, info: { exists: true, content, stats } };
+          } catch (error) {
+            if (error.code === 'ENOENT') {
+              return { path: fileChange.path, info: { exists: false } };
+            }
+            throw error;
           }
-          throw error;
+        }));
+
+        for (const { path, info } of results) {
+          state.files[path] = info;
         }
       };
 

@@ -343,6 +343,19 @@ describe('SafetyProtocol Change Execution & Helper Classes', () => {
       });
     });
 
+    it('should capture missing files correctly', async () => {
+      const changes = { files: [{ path: 'missing.js' }] };
+      fs.readFile.mockRejectedValue(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }));
+
+      const pointId = await safetyProtocol.rollbackManager.createPoint(changes);
+
+      const callArgs = fs.writeJSON.mock.calls[0];
+      const savedPoint = callArgs[1];
+      expect(savedPoint.state.files['missing.js']).toEqual({
+        exists: false
+      });
+    });
+
     it('should rollback by restoring state', async () => {
       const commit = { rollbackPoint: 'rb-1' };
       const rbPoint = {
