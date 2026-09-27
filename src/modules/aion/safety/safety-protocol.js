@@ -305,32 +305,40 @@ class RollbackManager {
     
     if (changes.files && changes.files.length > 0) {
       state.files = {};
-      const results = [];
-
-      // BOLT OPTIMIZATION: Chunked concurrent file processing to prevent EMFILE while speeding up I/O
-      for (let i = 0; i < changes.files.length; i += 20) {
-        const chunk = changes.files.slice(i, i + 20);
-        results.push(...await Promise.all(chunk.map(async (fileChange) => {
+      // BOLT OPTIMIZATION: Process files concurrently in chunks to prevent EMFILE errors
+      // and avoid double I/O from pathExists by using try-catch for ENOENT.
+      const CHUNK_SIZE = 20;
+      for (let i = 0; i < changes.files.length; i += CHUNK_SIZE) {
+        const chunk = changes.files.slice(i, i + CHUNK_SIZE);
+        
+        const results = await Promise.all(chunk.map(async (fileChange) => {
           const filePath = path.join(this.projectRoot, fileChange.path);
           try {
-            // BOLT OPTIMIZATION: Avoid pathExists double I/O, run readFile and stat in parallel
+            // Run read and stat concurrently
             const [content, stats] = await Promise.all([
               fs.readFile(filePath, 'utf8'),
               fs.stat(filePath)
             ]);
-            return { path: fileChange.path, data: { exists: true, content, stats } };
+
+            return {
+              path: fileChange.path,
+              data: { exists: true, content, stats }
+            };
           } catch (error) {
             if (error.code === 'ENOENT') {
-              return { path: fileChange.path, data: { exists: false } };
+              return {
+                path: fileChange.path,
+                data: { exists: false }
+              };
             }
             throw error;
           }
-        })));
-      }
+        }));
 
-      // Maintain deterministic order
-      for (const res of results) {
-        state.files[res.path] = res.data;
+        // Populate state synchronously to preserve deterministic order
+        for (const result of results) {
+          state.files[result.path] = result.data;
+        }
       }
     }
     

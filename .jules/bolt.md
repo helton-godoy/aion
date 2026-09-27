@@ -1,3 +1,3 @@
-## 2025-03-01 - Avoid Double I/O and EMFILE in Bulk File Operations
-**Learning:** Checking `fs.pathExists` before `fs.readFile` and `fs.stat` doubles disk I/O. Bulk processing without concurrency controls risks EMFILE errors.
-**Action:** Use chunked `Promise.all` (e.g., limit 20) and `try/catch` `ENOENT` to optimize bulk concurrent file reading.
+## 2025-05-25 - Promise.all Map Ordering Safety
+**Learning:** When executing I/O concurrently using `Promise.all(array.map(...))` and dynamically assigning to a state object based on file path resolution order, the assignment order becomes non-deterministic based on whichever promise resolves first. This can lead to unpredictable test assertions or snapshot differences.
+**Action:** Resolve the concurrent promises to an array of results first, then synchronously iterate over that array to populate the target object, preserving the original array order.
