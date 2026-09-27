@@ -322,6 +322,7 @@ class MemoryManager {
         const stats = await fs.stat(filePath);
         return { exists: true, size: stats.size };
       } catch (error) {
+        if (error.code !== 'ENOENT') throw error;
         return { exists: false, size: 0 };
       }
     };

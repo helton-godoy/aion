@@ -347,6 +347,25 @@ describe('SafetyProtocol Change Execution & Helper Classes', () => {
 
       await expect(safetyProtocol.rollbackManager.rollback(commit)).rejects.toThrow('Rollback point rb-not-found not found');
     });
+
+    it('should not misreport restoreState ENOENT as missing rollback point', async () => {
+      const commit = { rollbackPoint: 'rb-1' };
+      fs.readJSON.mockResolvedValue({ state: { files: {} } });
+      const restoreError = Object.assign(new Error('ENOENT: unlink failed'), { code: 'ENOENT' });
+      jest.spyOn(safetyProtocol.rollbackManager, 'restoreState').mockRejectedValue(restoreError);
+
+      await expect(safetyProtocol.rollbackManager.rollback(commit)).rejects.toThrow('ENOENT');
+      await expect(safetyProtocol.rollbackManager.rollback(commit)).rejects.not.toThrow('not found');
+    });
+
+    it('should propagate non-ENOENT errors from captureCurrentState', async () => {
+      const changes = { files: [{ path: 'locked.js' }] };
+      const eacces = Object.assign(new Error('EACCES: permission denied'), { code: 'EACCES' });
+      fs.readFile.mockRejectedValue(eacces);
+      fs.stat.mockResolvedValue({ size: 10 });
+
+      await expect(safetyProtocol.rollbackManager.createPoint(changes)).rejects.toThrow('EACCES');
+    });
   });
 
 

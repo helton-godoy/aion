@@ -46,3 +46,34 @@ describe('MemoryManager', () => {
     expect(status.lastActivity).toBeNull();
   });
 });
+
+describe('MemoryManager getStatus error handling', () => {
+  const projectRoot = '/test/root';
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('should map ENOENT stat to exists:false', async () => {
+    jest.spyOn(fs, 'readFile').mockResolvedValue('# Test\n');
+    const enoent = Object.assign(new Error('ENOENT: no such file'), { code: 'ENOENT' });
+    jest.spyOn(fs, 'stat').mockRejectedValue(enoent);
+
+    const mm = new MemoryManager(projectRoot);
+    const status = await mm.getStatus();
+
+    expect(status.productContext.exists).toBe(false);
+    expect(status.productContext.size).toBe(0);
+    expect(status.activeContext.exists).toBe(false);
+    expect(status.activeContext.size).toBe(0);
+  });
+
+  it('should propagate non-ENOENT stat errors instead of reporting exists:false', async () => {
+    jest.spyOn(fs, 'readFile').mockResolvedValue('# Test\n');
+    const eacces = Object.assign(new Error('EACCES: permission denied'), { code: 'EACCES' });
+    jest.spyOn(fs, 'stat').mockRejectedValue(eacces);
+
+    const mm = new MemoryManager(projectRoot);
+    await expect(mm.getStatus()).rejects.toThrow('EACCES');
+  });
+});
