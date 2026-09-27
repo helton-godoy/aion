@@ -1,0 +1,3 @@
+## 2024-03-24 - [Disk I/O Optimization in MemoryManager]
+**Learning:** `fs.pathExists` before `fs.readFile` or `fs.stat` is an unnecessary and costly disk I/O operation (Look before you leap anti-pattern). Instead, handling the potential `ENOENT` error in a `catch` block is more performant as it skips the preliminary existence check entirely, almost halving execution time in heavily used memory status checks. Parallelizing independent operations with `Promise.all` adds an extra boost.
+**Action:** Use `try/catch` with `ENOENT` checks for disk reads and parallelize stats with `Promise.all` across codebase when dealing with file existence validation before reads/stats.
