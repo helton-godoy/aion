@@ -302,7 +302,7 @@ class RollbackManager {
   async captureCurrentState(changes) {
     const state = {};
     
-    if (changes.files) {
+    if (changes.files && changes.files.length > 0) {
       state.files = {};
 
       // BOLT OPTIMIZATION: Chunked concurrent file state capture and eliminate redundant fs.pathExists checks
@@ -335,6 +335,11 @@ class RollbackManager {
         for (const result of chunkResults) {
           state.files[result.path] = result.data;
         }
+      };
+
+      const results = await Promise.all(changes.files.map(getFileInfo));
+      for (const result of results) {
+        state.files[result.path] = result.info;
       }
     }
     
