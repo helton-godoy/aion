@@ -311,17 +311,33 @@ class MemoryManager {
   async getStatus() {
     const context = await this.getContext();
     
+    // ⚡ Bolt: Helper to get stats in a single I/O call
+    const getFileStats = async (filePath) => {
+      try {
+        const stats = await fs.stat(filePath);
+        return { exists: true, size: stats.size };
+      } catch (error) {
+        if (error.code === 'ENOENT') {
+          return { exists: false, size: 0 };
+        }
+        throw error;
+      }
+    };
+
+    const [productStats, activeStats] = await Promise.all([
+      getFileStats(this.productContextPath),
+      getFileStats(this.activeContextPath)
+    ]);
+
     return {
       productContext: {
-        exists: await fs.pathExists(this.productContextPath),
-        size: await fs.pathExists(this.productContextPath) ? 
-          (await fs.stat(this.productContextPath)).size : 0,
+        exists: productStats.exists,
+        size: productStats.size,
         artifacts: context.product.artifacts?.length || 0
       },
       activeContext: {
-        exists: await fs.pathExists(this.activeContextPath),
-        size: await fs.pathExists(this.activeContextPath) ? 
-          (await fs.stat(this.activeContextPath)).size : 0,
+        exists: activeStats.exists,
+        size: activeStats.size,
         activePersonas: Object.keys(context.active.personas || {}).length
       },
       totalArtifacts: context.combined.artifacts?.length || 0,
