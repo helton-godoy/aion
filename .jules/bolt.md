@@ -1,0 +1,5 @@
+## 2024-05-18 - Optimize Node.js File System Checks
+
+**Learning:** When needing to check if a file exists before reading it, sequential `fs.pathExists` followed by `fs.readJSON` or `fs.readFile` incurs double I/O cost which can be a bottleneck for large batches of files. Node.js natively handles missing files by throwing an error with `code: 'ENOENT'`. In `fs-extra` operations like `fs.readJSON`, attempting the read directly and catching the `ENOENT` error avoids the redundant stat check. Furthermore, when gathering multiple disparate file metadata items (like content and stats), executing them in parallel with `Promise.all` improves overall disk access concurrency compared to consecutive blocking calls.
+
+**Action:** Replace `if (await fs.pathExists(path))` patterns with a `try/catch` block handling the `ENOENT` error. Always prefer `Promise.all` for multiple independent file I/O operations (e.g. `fs.readFile` and `fs.stat`) on the same file concurrently. Mock missing files in Jest properly using `.mockRejectedValue(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }))`.
