@@ -278,19 +278,21 @@ class RollbackManager {
     
     const pointPath = path.join(this.rollbackPointsPath, `${commit.rollbackPoint}.json`);
     
+    let rollbackPoint;
     try {
-      const rollbackPoint = await fs.readJSON(pointPath);
-
-      // Restore state
-      await this.restoreState(rollbackPoint.state);
-
-      return rollbackPoint;
+      rollbackPoint = await fs.readJSON(pointPath);
     } catch (error) {
       if (error.code === 'ENOENT') {
         throw new Error(`Rollback point ${commit.rollbackPoint} not found`);
       }
       throw error;
     }
+
+    // Restore outside the try: an ENOENT from restoreState must not be
+    // misreported as a missing rollback point file.
+    await this.restoreState(rollbackPoint.state);
+
+    return rollbackPoint;
   }
 
   /**
