@@ -78,8 +78,5 @@ reproduce().catch(err => {
     process.exit(1);
 });
 
-describe('Path Traversal Dummy Test', () => {
-  it('should pass', () => {
-    expect(true).toBe(true);
-  });
-});
+// Dummy test to pass Jest
+describe('Path Traversal', () => { it('dummy', () => { expect(true).toBe(true); }); });

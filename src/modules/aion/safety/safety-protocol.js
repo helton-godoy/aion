@@ -306,35 +306,44 @@ class RollbackManager {
     
     if (changes.files && changes.files.length > 0) {
       state.files = {};
-
-      // ⚡ Bolt Performance Optimization:
-      // - Removed sequential 'for...of' loop and redundant fs.pathExists checks.
-      // - Uses chunked Promise.all to process up to 20 files concurrently, preventing EMFILE errors.
-      // - Parallelizes fs.readFile and fs.stat within each file operation.
-      // - Collects results into an array first to preserve deterministic key insertion order.
-      // Expected impact: Speeds up state capture by ~50-80% for commits with many files, reducing I/O wait times.
+      // BOLT OPTIMIZATION: Process files in parallel chunks of 20 to avoid EMFILE errors
+      const chunks = [];
       const chunkSize = 20;
       for (let i = 0; i < changes.files.length; i += chunkSize) {
-        const chunk = changes.files.slice(i, i + chunkSize);
-        
-        const chunkResults = await Promise.all(chunk.map(async (fileChange) => {
+        chunks.push(changes.files.slice(i, i + chunkSize));
+      }
+
+      for (const chunk of chunks) {
+        // BOLT OPTIMIZATION: Process chunk concurrently and collect results before updating state to maintain deterministic order
+        const results = await Promise.all(chunk.map(async (fileChange) => {
           const filePath = path.join(this.projectRoot, fileChange.path);
           try {
+            // BOLT OPTIMIZATION: Avoid double I/O (fs.pathExists + fs.readFile/stat).
+            // Run readFile and stat in parallel and handle ENOENT natively.
             const [content, stats] = await Promise.all([
               fs.readFile(filePath, 'utf8'),
               fs.stat(filePath)
             ]);
-
-            return { path: fileChange.path, data: { exists: true, content, stats } };
+            return {
+              path: fileChange.path,
+              data: {
+                exists: true,
+                content,
+                stats
+              }
+            };
           } catch (error) {
             if (error.code === 'ENOENT') {
-              return { path: fileChange.path, data: { exists: false } };
+              return {
+                path: fileChange.path,
+                data: { exists: false }
+              };
             }
             throw error;
           }
         }));
 
-        for (const result of chunkResults) {
+        for (const result of results) {
           state.files[result.path] = result.data;
         }
       }
