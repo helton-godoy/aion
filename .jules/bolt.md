@@ -1,0 +1,3 @@
+## 2025-06-13 - Parallelize File Data Capture during Rollbacks
+**Learning:** In `SafetyProtocol`'s `captureCurrentState`, using `Promise.all` concurrently mapped across `changes.files` for reading `fs.readFile` and `fs.stat` while handling `ENOENT` natively eliminates redundant `fs.pathExists` checks and unblocks sequential looping.
+**Action:** Always favor native error handling of standard POSIX signals like `ENOENT` over explicit `fs.pathExists` to avoid duplicate file system I/O, and remember to batch mapping operations with `Promise.all` when chronological ordering isn't strictly required.
