@@ -302,7 +302,7 @@ class RollbackManager {
   async captureCurrentState(changes) {
     const state = {};
     
-    if (changes.files) {
+    if (changes.files && changes.files.length > 0) {
       state.files = {};
 
       // BOLT OPTIMIZATION: Chunked concurrent execution, parallelize I/O, skip pathExists
