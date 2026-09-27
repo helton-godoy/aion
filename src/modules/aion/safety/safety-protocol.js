@@ -280,11 +280,16 @@ class RollbackManager {
     
     const pointPath = path.join(this.rollbackPointsPath, `${commit.rollbackPoint}.json`);
     
-    if (!(await fs.pathExists(pointPath))) {
-      throw new Error(`Rollback point ${commit.rollbackPoint} not found`);
+    let rollbackPoint;
+    try {
+      // BOLT OPTIMIZATION: Avoid double I/O check
+      rollbackPoint = await fs.readJSON(pointPath);
+    } catch (error) {
+      if (error.code === 'ENOENT') {
+        throw new Error(`Rollback point ${commit.rollbackPoint} not found`);
+      }
+      throw error;
     }
-    
-    const rollbackPoint = await fs.readJSON(pointPath);
     
     // Restore state
     await this.restoreState(rollbackPoint.state);
@@ -298,7 +303,7 @@ class RollbackManager {
   async captureCurrentState(changes) {
     const state = {};
     
-    if (changes.files) {
+    if (changes.files && changes.files.length > 0) {
       state.files = {};
 
       // BOLT OPTIMIZATION: Process files concurrently in chunks, avoiding pathExists
