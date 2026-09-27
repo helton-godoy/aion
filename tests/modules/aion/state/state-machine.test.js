@@ -305,4 +305,64 @@ describe('StateMachine Core', () => {
     });
   });
 
+
+  describe("additional edge cases for full coverage", () => {
+    it("should default limit to 10 in getHandoverHistory", () => {
+      stateMachine.handoverLog = Array.from({ length: 15 }, (_, i) => ({ id: i }));
+      const history = stateMachine.getHandoverHistory();
+      expect(history).toHaveLength(10);
+      expect(history[0].id).toBe(5);
+    });
+
+    it("should stop parsing when encountering next section header in parseHandoverLog", async () => {
+      const markdownContent = `# Header
+## Handover History
+| 2025-01-01 | INIT | PM | Spec | First step |
+| Invalid Row |
+## Next Section
+| 2025-01-02 | PM | ARCHITECT | Spec2 | Should not parse |
+`;
+      fs.readFile.mockResolvedValue(markdownContent);
+      await stateMachine.loadHandoverLog();
+      expect(stateMachine.handoverLog).toHaveLength(1);
+      expect(stateMachine.handoverLog[0].date).toBe("2025-01-01");
+    });
+
+    it("should format handover log with empty artifacts, default artifact type, and empty history last activity", async () => {
+      stateMachine.currentState = "INIT";
+      stateMachine.handoverLog = [];
+      await stateMachine.saveHandoverLog();
+      let content = fs.writeFile.mock.calls[fs.writeFile.mock.calls.length - 1][1];
+      expect(content).toContain("- **Last Activity**: None");
+
+      stateMachine.handoverLog = [
+        {
+          timestamp: new Date("2025-01-01T00:00:00Z"),
+          from: "INIT",
+          to: "PM",
+          artifacts: [{}] // missing type
+        },
+        {
+          timestamp: new Date("2025-01-02T00:00:00Z"),
+          from: "PM",
+          to: "ARCHITECT",
+          artifacts: null
+        }
+      ];
+      await stateMachine.saveHandoverLog();
+      content = fs.writeFile.mock.calls[fs.writeFile.mock.calls.length - 1][1];
+      expect(content).toContain("Artifact");
+      expect(content).toContain("None");
+    });
+
+    it("should handle unknown artifact type in getStatistics", () => {
+      stateMachine.currentState = "DEVELOPER";
+      stateMachine.handoverLog = [
+        { from: "INIT", to: "PM", artifacts: [{}] }
+      ];
+      const stats = stateMachine.getStatistics();
+      expect(stats.artifactTypes["Unknown"]).toBe(1);
+    });
+  });
+
 });
