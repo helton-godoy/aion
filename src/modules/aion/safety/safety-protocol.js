@@ -297,21 +297,38 @@ class RollbackManager {
     const state = {};
     
     if (changes.files) {
-      state.files = {};
-      for (const fileChange of changes.files) {
+      // Use Promise.all to fetch file data concurrently for all changed files
+      const fileDataPromises = changes.files.map(async (fileChange) => {
         const filePath = path.join(this.projectRoot, fileChange.path);
         
-        if (await fs.pathExists(filePath)) {
-          state.files[fileChange.path] = {
-            exists: true,
-            content: await fs.readFile(filePath, 'utf8'),
-            stats: await fs.stat(filePath)
+        try {
+          // Optimization: Execute read and stat concurrently, avoiding redundant pathExists check
+          const [content, stats] = await Promise.all([
+            fs.readFile(filePath, 'utf8'),
+            fs.stat(filePath)
+          ]);
+
+          return {
+            path: fileChange.path,
+            info: { exists: true, content, stats }
           };
-        } else {
-          state.files[fileChange.path] = {
-            exists: false
-          };
+        } catch (error) {
+          if (error.code === 'ENOENT') {
+            return {
+              path: fileChange.path,
+              info: { exists: false }
+            };
+          }
+          throw error;
         }
+      });
+
+      const results = await Promise.all(fileDataPromises);
+
+      state.files = {};
+      // Populate state.files synchronously to maintain deterministic key insertion order
+      for (const result of results) {
+        state.files[result.path] = result.info;
       }
     }
     
