@@ -304,26 +304,23 @@ class RollbackManager {
     
     if (changes.files && changes.files.length > 0) {
       state.files = {};
+      const chunkSize = 20;
 
-      // BOLT OPTIMIZATION: Process files concurrently in chunks to prevent EMFILE errors
-      // while reducing I/O time. Replaces sequential fs.pathExists -> fs.readFile -> fs.stat
-      // with a parallel approach that catches ENOENT natively.
-      const CHUNK_SIZE = 20;
-      for (let i = 0; i < changes.files.length; i += CHUNK_SIZE) {
-        const chunk = changes.files.slice(i, i + CHUNK_SIZE);
+      for (let i = 0; i < changes.files.length; i += chunkSize) {
+        const chunk = changes.files.slice(i, i + chunkSize);
         
-        const chunkPromises = chunk.map(async (fileChange) => {
+        const chunkResults = await Promise.all(chunk.map(async (fileChange) => {
           const filePath = path.join(this.projectRoot, fileChange.path);
           try {
-            // Read file and stat in parallel
+            // BOLT OPTIMIZATION: Consolidate file operations using concurrent readFile and stat calls
+            // wrapped in try-catch to handle ENOENT. This avoids a separate pathExists I/O operation.
             const [content, stats] = await Promise.all([
               fs.readFile(filePath, 'utf8'),
               fs.stat(filePath)
             ]);
-
             return {
               path: fileChange.path,
-              data: {
+              info: {
                 exists: true,
                 content,
                 stats
@@ -333,17 +330,15 @@ class RollbackManager {
             if (error.code === 'ENOENT') {
               return {
                 path: fileChange.path,
-                data: { exists: false }
+                info: { exists: false }
               };
             }
-            throw error; // Re-throw other unexpected errors (e.g., EACCES)
+            throw error;
           }
-        });
+        }));
 
-        // Await chunk to process, then populate state.files in deterministic order
-        const chunkResults = await Promise.all(chunkPromises);
         for (const result of chunkResults) {
-          state.files[result.path] = result.data;
+          state.files[result.path] = result.info;
         }
       }
     }

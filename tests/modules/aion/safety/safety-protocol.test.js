@@ -286,16 +286,9 @@ describe('SafetyProtocol Change Execution & Helper Classes', () => {
     });
 
     it('should capture current state during createPoint', async () => {
-      const changes = { files: [{ path: 'existing.js' }, { path: 'new.js' }] };
-
-      fs.readFile.mockImplementation(async (filePath) => {
-        if (filePath.endsWith('existing.js')) return 'old content';
-        throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
-      });
-      fs.stat.mockImplementation(async (filePath) => {
-        if (filePath.endsWith('existing.js')) return { size: 100 };
-        throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
-      });
+      const changes = { files: [{ path: 'existing.js' }] };
+      fs.readFile.mockResolvedValue('old content');
+      fs.stat.mockResolvedValue({ size: 100 });
 
       const pointId = await safetyProtocol.rollbackManager.createPoint(changes);
 
@@ -307,6 +300,22 @@ describe('SafetyProtocol Change Execution & Helper Classes', () => {
         stats: { size: 100 }
       });
       expect(savedPoint.state.files['new.js']).toEqual({
+        exists: false
+      });
+    });
+
+    it('should handle ENOENT when capturing current state during createPoint', async () => {
+      const changes = { files: [{ path: 'missing.js' }] };
+      const enoentError = new Error('ENOENT');
+      enoentError.code = 'ENOENT';
+      fs.readFile.mockRejectedValue(enoentError);
+      fs.stat.mockRejectedValue(enoentError);
+
+      await safetyProtocol.rollbackManager.createPoint(changes);
+
+      const callArgs = fs.writeJSON.mock.calls[0];
+      const savedPoint = callArgs[1];
+      expect(savedPoint.state.files['missing.js']).toEqual({
         exists: false
       });
     });
