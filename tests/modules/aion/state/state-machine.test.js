@@ -250,6 +250,18 @@ describe('StateMachine Core', () => {
     });
   });
 
+  describe('validateTransition', () => {
+    it('should throw an error for invalid persona transition', () => {
+      expect(() => stateMachine.validateTransition('INIT', 'DEVELOPER'))
+        .toThrow('Invalid transition from INIT to DEVELOPER');
+    });
+
+    it('should not throw an error for valid persona transition', () => {
+      expect(() => stateMachine.validateTransition('INIT', 'PM'))
+        .not.toThrow();
+    });
+  });
+
   describe('TransitionRules', () => {
     it('should correctly evaluate transition validity, get transitions, and add transitions', () => {
       const rules = stateMachine.transitionRules;
