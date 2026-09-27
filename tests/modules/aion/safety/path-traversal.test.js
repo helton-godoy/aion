@@ -73,7 +73,26 @@ async function reproduce() {
   }
 }
 
-reproduce().catch(err => {
-    console.error(err);
-    process.exit(1);
-});
+// Make it a valid jest test file while preserving its ability to be run as a standalone script
+if (typeof test === 'function') {
+  test('Path traversal security script executes successfully', async () => {
+    const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation();
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
+    const exitSpy = jest.spyOn(process, 'exit').mockImplementation();
+
+    await reproduce();
+
+    expect(exitSpy).not.toHaveBeenCalledWith(1);
+
+    consoleSpy.mockRestore();
+    errorSpy.mockRestore();
+    warnSpy.mockRestore();
+    exitSpy.mockRestore();
+  });
+} else {
+  reproduce().catch(err => {
+      console.error(err);
+      process.exit(1);
+  });
+}

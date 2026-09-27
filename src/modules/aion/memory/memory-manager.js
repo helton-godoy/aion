@@ -68,13 +68,13 @@ class MemoryManager {
    */
   async loadProductContext() {
     try {
-      if (await fs.pathExists(this.productContextPath)) {
-        const content = await fs.readFile(this.productContextPath, 'utf8');
-        return this.parseMarkdownContent(content);
-      }
-      return this.getDefaultProductContext();
+      // ⚡ Bolt: Removed redundant fs.pathExists check, halving disk I/O operations by handling ENOENT natively
+      const content = await fs.readFile(this.productContextPath, 'utf8');
+      return this.parseMarkdownContent(content);
     } catch (error) {
-      console.warn(chalk.yellow(`⚠️  Could not load product context: ${error.message}`));
+      if (error.code !== 'ENOENT') {
+        console.warn(chalk.yellow(`⚠️  Could not load product context: ${error.message}`));
+      }
       return this.getDefaultProductContext();
     }
   }
@@ -84,13 +84,13 @@ class MemoryManager {
    */
   async loadActiveContext() {
     try {
-      if (await fs.pathExists(this.activeContextPath)) {
-        const content = await fs.readFile(this.activeContextPath, 'utf8');
-        return this.parseMarkdownContent(content);
-      }
-      return this.getDefaultActiveContext();
+      // ⚡ Bolt: Removed redundant fs.pathExists check, halving disk I/O operations by handling ENOENT natively
+      const content = await fs.readFile(this.activeContextPath, 'utf8');
+      return this.parseMarkdownContent(content);
     } catch (error) {
-      console.warn(chalk.yellow(`⚠️  Could not load active context: ${error.message}`));
+      if (error.code !== 'ENOENT') {
+        console.warn(chalk.yellow(`⚠️  Could not load active context: ${error.message}`));
+      }
       return this.getDefaultActiveContext();
     }
   }
@@ -306,22 +306,41 @@ class MemoryManager {
   }
 
   /**
+   * Helper for getting file stats safely
+   */
+  async _getFileStats(filePath) {
+    try {
+      const stats = await fs.stat(filePath);
+      return { exists: true, size: stats.size };
+    } catch (error) {
+      if (error.code === 'ENOENT') {
+        return { exists: false, size: 0 };
+      }
+      throw error;
+    }
+  }
+
+  /**
    * Get memory bank status
    */
   async getStatus() {
-    const context = await this.getContext();
+    // ⚡ Bolt: Executing independent file stats and context fetch in parallel to maximize disk I/O efficiency.
+    // Also eliminates sequential fs.pathExists followed by fs.stat for each file.
+    const [context, productStats, activeStats] = await Promise.all([
+      this.getContext(),
+      this._getFileStats(this.productContextPath),
+      this._getFileStats(this.activeContextPath)
+    ]);
     
     return {
       productContext: {
-        exists: await fs.pathExists(this.productContextPath),
-        size: await fs.pathExists(this.productContextPath) ? 
-          (await fs.stat(this.productContextPath)).size : 0,
+        exists: productStats.exists,
+        size: productStats.size,
         artifacts: context.product.artifacts?.length || 0
       },
       activeContext: {
-        exists: await fs.pathExists(this.activeContextPath),
-        size: await fs.pathExists(this.activeContextPath) ? 
-          (await fs.stat(this.activeContextPath)).size : 0,
+        exists: activeStats.exists,
+        size: activeStats.size,
         activePersonas: Object.keys(context.active.personas || {}).length
       },
       totalArtifacts: context.combined.artifacts?.length || 0,
