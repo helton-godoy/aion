@@ -236,4 +236,31 @@ describe('MemoryManager getStatus error handling', () => {
     const mm = new MemoryManager(projectRoot);
     await expect(mm.getStatus()).rejects.toThrow('EACCES');
   });
+
+  describe("isSignificantUpdate", () => {
+    test("returns true when artifacts include significant deliverable types", () => {
+      const memoryManager = new MemoryManager(testRoot);
+
+      expect(memoryManager.isSignificantUpdate([{ type: "PRD" }])).toBe(true);
+      expect(memoryManager.isSignificantUpdate([{ type: "TECH_SPEC_V1" }])).toBe(true);
+      expect(memoryManager.isSignificantUpdate([{ type: "IMPLEMENTATION" }])).toBe(true);
+      expect(memoryManager.isSignificantUpdate([{ type: "RELEASE_NOTES" }])).toBe(true);
+      expect(memoryManager.isSignificantUpdate([{ type: "OTHER" }, { type: "PRD" }])).toBe(true);
+    });
+
+    test("returns false when artifacts array is empty", () => {
+      const memoryManager = new MemoryManager(testRoot);
+      expect(memoryManager.isSignificantUpdate([])).toBe(false);
+    });
+
+    test("returns false when artifacts contain non-significant types", () => {
+      const memoryManager = new MemoryManager(testRoot);
+      expect(memoryManager.isSignificantUpdate([{ type: "CODE" }, { type: "LOG" }])).toBe(false);
+    });
+
+    test("returns false when artifact objects are missing type property or type is non-matching", () => {
+      const memoryManager = new MemoryManager(testRoot);
+      expect(memoryManager.isSignificantUpdate([{ name: "no-type-artifact" }, { type: null }, { type: undefined }])).toBe(false);
+    });
+  });
 });
