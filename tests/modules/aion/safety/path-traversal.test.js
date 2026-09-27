@@ -73,7 +73,14 @@ async function reproduce() {
   }
 }
 
-reproduce().catch(err => {
-    console.error(err);
-    process.exit(1);
-});
+// Jest wrapper so test runner does not fail with "must contain at least one test"
+if (typeof test === 'function') {
+  test('Path Traversal Standalone Script Wrapper', async () => {
+    await reproduce();
+  });
+} else {
+  reproduce().catch(err => {
+      console.error(err);
+      process.exit(1);
+  });
+}
