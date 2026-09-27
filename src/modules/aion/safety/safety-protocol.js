@@ -202,7 +202,7 @@ class SafetyProtocol {
     const trackerPath = path.join(this.projectRoot, '.aion', 'commit-tracker.json');
     
     try {
-      // BOLT OPTIMIZATION: Avoid double I/O. Try reading directly and catch ENOENT.
+      // BOLT OPTIMIZATION: Avoid double I/O by directly reading and handling ENOENT
       this.commitTracker = await fs.readJSON(trackerPath);
     } catch (error) {
       if (error.code !== 'ENOENT') {
@@ -281,7 +281,7 @@ class RollbackManager {
     
     let rollbackPoint;
     try {
-      // BOLT OPTIMIZATION: Avoid double I/O. Try reading directly and catch ENOENT.
+      // BOLT OPTIMIZATION: Avoid double I/O by directly reading and handling ENOENT
       rollbackPoint = await fs.readJSON(pointPath);
     } catch (error) {
       if (error.code === 'ENOENT') {
@@ -289,7 +289,7 @@ class RollbackManager {
       }
       throw error;
     }
-    
+
     // Restore state
     await this.restoreState(rollbackPoint.state);
     
@@ -305,28 +305,35 @@ class RollbackManager {
     if (changes.files && changes.files.length > 0) {
       state.files = {};
 
-      // BOLT OPTIMIZATION: Process files concurrently using Promise.all
-      // and avoid double I/O (fs.pathExists followed by readFile/stat)
-      // by directly trying to read/stat and handling ENOENT.
-      const getFileInfo = async (fileChange) => {
-        const filePath = path.join(this.projectRoot, fileChange.path);
-        try {
-          const [content, stats] = await Promise.all([
-            fs.readFile(filePath, 'utf8'),
-            fs.stat(filePath)
-          ]);
-          return {
-            path: fileChange.path,
-            info: { exists: true, content, stats }
-          };
-        } catch (error) {
-          if (error.code === 'ENOENT') {
+      // BOLT OPTIMIZATION: Chunked concurrent file state capture and eliminate redundant fs.pathExists checks
+      // Processes files in chunks to avoid EMFILE errors while parallelizing I/O.
+      // Also uses Promise.all for concurrent readFile and stat per file.
+      const chunkSize = 20;
+      for (let i = 0; i < changes.files.length; i += chunkSize) {
+        const chunk = changes.files.slice(i, i + chunkSize);
+        
+        const chunkResults = await Promise.all(chunk.map(async (fileChange) => {
+          const filePath = path.join(this.projectRoot, fileChange.path);
+          try {
+            const [content, stats] = await Promise.all([
+              fs.readFile(filePath, 'utf8'),
+              fs.stat(filePath)
+            ]);
             return {
               path: fileChange.path,
-              info: { exists: false }
+              data: { exists: true, content, stats }
             };
+          } catch (error) {
+            if (error.code === 'ENOENT') {
+              return { path: fileChange.path, data: { exists: false } };
+            }
+            throw error;
           }
-          throw error;
+        }));
+
+        // Ensure deterministic key insertion order by processing chunkResults synchronously
+        for (const result of chunkResults) {
+          state.files[result.path] = result.data;
         }
       };
 
