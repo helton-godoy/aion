@@ -46,6 +46,21 @@ describe('StateMachine Core', () => {
     });
   });
 
+
+  describe("validateTransition", () => {
+    it("should pass without error when transition is valid", () => {
+      jest.spyOn(stateMachine.transitionRules, "isValid").mockReturnValue(true);
+      expect(() => stateMachine.validateTransition("INIT", "PM")).not.toThrow();
+      expect(stateMachine.transitionRules.isValid).toHaveBeenCalledWith("INIT", "PM");
+    });
+
+    it("should throw an error when transition is invalid", () => {
+      jest.spyOn(stateMachine.transitionRules, "isValid").mockReturnValue(false);
+      expect(() => stateMachine.validateTransition("INIT", "DEVELOPER")).toThrow("Invalid transition from INIT to DEVELOPER");
+      expect(stateMachine.transitionRules.isValid).toHaveBeenCalledWith("INIT", "DEVELOPER");
+    });
+  });
+
   describe('handover', () => {
     it('should perform a valid handover successfully', async () => {
       jest.spyOn(stateMachine, 'saveHandoverLog').mockResolvedValue();
