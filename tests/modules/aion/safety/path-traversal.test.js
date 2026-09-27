@@ -73,7 +73,14 @@ async function reproduce() {
   }
 }
 
-reproduce().catch(err => {
-    console.error(err);
-    process.exit(1);
-});
+// Ensure jest runs this without "Your test suite must contain at least one test."
+if (typeof test === 'function') {
+  test('dummy standalone script test', () => {
+    expect(true).toBe(true);
+  });
+} else {
+  reproduce().catch(err => {
+      console.error(err);
+      process.exit(1);
+  });
+}
