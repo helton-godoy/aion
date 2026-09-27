@@ -299,6 +299,9 @@ describe('SafetyProtocol Change Execution & Helper Classes', () => {
         content: 'old content',
         stats: { size: 100 }
       });
+      expect(savedPoint.state.files['missing.js']).toEqual({
+        exists: false
+      });
     });
 
     it('should capture current state when file does not exist', async () => {
