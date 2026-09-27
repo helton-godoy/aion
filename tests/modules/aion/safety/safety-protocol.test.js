@@ -275,8 +275,9 @@ describe('SafetyProtocol Change Execution & Helper Classes', () => {
   describe('RollbackManager', () => {
     it('should create a rollback point', async () => {
       const changes = { files: [] };
-      fs.readFile.mockRejectedValue(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }));
-      fs.stat.mockRejectedValue(Object.assign(new Error('ENOENT'), { code: 'ENOENT' })); // for captureCurrentState
+      const enoentError = Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
+      fs.readFile.mockRejectedValue(enoentError);
+      fs.stat.mockRejectedValue(enoentError); // for captureCurrentState
 
       const pointId = await safetyProtocol.rollbackManager.createPoint(changes);
 
