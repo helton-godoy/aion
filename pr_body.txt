@@ -1,0 +1,4 @@
+💡 What: Optimized `RollbackManager.captureCurrentState` by replacing sequential `fs.pathExists` checks with chunked concurrent processing using `Promise.all` and native `ENOENT` try/catch error handling.
+🎯 Why: Calling `fs.pathExists` prior to reading a file creates unnecessary double I/O operations and performance overhead. Also, unbounded concurrent file operations can trigger `EMFILE` errors, so chunking ensures stability.
+📊 Impact: Expected to significantly reduce disk I/O time during state capture and prevent memory/file descriptor exhaustion (EMFILE) on large commits.
+🔬 Measurement: Verify state capture execution times via `npm test` and trace logs on large micro-commits.
