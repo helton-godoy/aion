@@ -1,0 +1,3 @@
+## 2023-10-27 - [Optimize File I/O with ENOENT]
+**Learning:** Using `fs.pathExists` before reading a file introduces a Time-Of-Check to Time-Of-Use (TOCTOU) race condition and requires two system calls. When dealing with bulk file operations, this causes measurable I/O delays.
+**Action:** Use "Easier to Ask for Forgiveness than Permission" (EAFP). Wrap direct read operations (`fs.readFile`, `fs.readJSON`, `fs.stat`) in `try...catch` blocks and handle `error.code === 'ENOENT'` natively to halve disk I/O and prevent race conditions. For concurrent I/O on multiple files, combine with chunked `Promise.all` to avoid `EMFILE` limits.
