@@ -298,19 +298,52 @@ class RollbackManager {
     
     if (changes.files) {
       state.files = {};
-      for (const fileChange of changes.files) {
-        const filePath = path.join(this.projectRoot, fileChange.path);
+
+      // ⚡ Bolt Optimization: Process files in chunks to prevent EMFILE errors
+      // and parallelize disk I/O operations without relying on redundant pathExists checks.
+      const CHUNK_SIZE = 20;
+      for (let i = 0; i < changes.files.length; i += CHUNK_SIZE) {
+        const chunk = changes.files.slice(i, i + CHUNK_SIZE);
         
-        if (await fs.pathExists(filePath)) {
-          state.files[fileChange.path] = {
-            exists: true,
-            content: await fs.readFile(filePath, 'utf8'),
-            stats: await fs.stat(filePath)
-          };
-        } else {
-          state.files[fileChange.path] = {
-            exists: false
-          };
+        // Parallelize reads within the chunk
+        const chunkResults = await Promise.all(
+          chunk.map(async (fileChange) => {
+            const filePath = path.join(this.projectRoot, fileChange.path);
+            try {
+              // ⚡ Bolt Optimization: Parallelize readFile and stat, avoiding pathExists check.
+              // This is faster because it saves an I/O operation (pathExists).
+              const [content, stats] = await Promise.all([
+                fs.readFile(filePath, 'utf8'),
+                fs.stat(filePath)
+              ]);
+              return {
+                path: fileChange.path,
+                exists: true,
+                content,
+                stats
+              };
+            } catch (error) {
+              if (error.code === 'ENOENT') {
+                return { path: fileChange.path, exists: false };
+              }
+              throw error; // Rethrow other unexpected errors
+            }
+          })
+        );
+
+        // Synchronously populate state.files to guarantee deterministic key insertion order
+        for (const result of chunkResults) {
+          if (result.exists) {
+            state.files[result.path] = {
+              exists: true,
+              content: result.content,
+              stats: result.stats
+            };
+          } else {
+            state.files[result.path] = {
+              exists: false
+            };
+          }
         }
       }
     }
