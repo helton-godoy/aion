@@ -68,13 +68,14 @@ class MemoryManager {
    */
   async loadProductContext() {
     try {
-      if (await fs.pathExists(this.productContextPath)) {
-        const content = await fs.readFile(this.productContextPath, 'utf8');
-        return this.parseMarkdownContent(content);
-      }
-      return this.getDefaultProductContext();
+      // ⚡ Bolt Optimization: Removed redundant fs.pathExists check before fs.readFile to reduce disk I/O.
+      // Catching ENOENT is more performant and prevents Time-of-Check to Time-of-Use overhead.
+      const content = await fs.readFile(this.productContextPath, 'utf8');
+      return this.parseMarkdownContent(content);
     } catch (error) {
-      console.warn(chalk.yellow(`⚠️  Could not load product context: ${error.message}`));
+      if (error.code !== 'ENOENT') {
+        console.warn(chalk.yellow(`⚠️  Could not load product context: ${error.message}`));
+      }
       return this.getDefaultProductContext();
     }
   }
@@ -84,13 +85,13 @@ class MemoryManager {
    */
   async loadActiveContext() {
     try {
-      if (await fs.pathExists(this.activeContextPath)) {
-        const content = await fs.readFile(this.activeContextPath, 'utf8');
-        return this.parseMarkdownContent(content);
-      }
-      return this.getDefaultActiveContext();
+      // ⚡ Bolt Optimization: Removed redundant fs.pathExists check before fs.readFile.
+      const content = await fs.readFile(this.activeContextPath, 'utf8');
+      return this.parseMarkdownContent(content);
     } catch (error) {
-      console.warn(chalk.yellow(`⚠️  Could not load active context: ${error.message}`));
+      if (error.code !== 'ENOENT') {
+        console.warn(chalk.yellow(`⚠️  Could not load active context: ${error.message}`));
+      }
       return this.getDefaultActiveContext();
     }
   }
@@ -311,17 +312,28 @@ class MemoryManager {
   async getStatus() {
     const context = await this.getContext();
     
+    // ⚡ Bolt Optimization: Removed sequential fs.pathExists and fs.stat calls.
+    // Executing fs.stat concurrently via Promise.all and handling ENOENT natively halves the disk I/O cost.
+    const [productStat, activeStat] = await Promise.all([
+      fs.stat(this.productContextPath).catch(e => {
+        if (e.code === 'ENOENT') return { size: -1 };
+        throw e;
+      }),
+      fs.stat(this.activeContextPath).catch(e => {
+        if (e.code === 'ENOENT') return { size: -1 };
+        throw e;
+      })
+    ]);
+
     return {
       productContext: {
-        exists: await fs.pathExists(this.productContextPath),
-        size: await fs.pathExists(this.productContextPath) ? 
-          (await fs.stat(this.productContextPath)).size : 0,
+        exists: productStat.size !== -1,
+        size: productStat.size !== -1 ? productStat.size : 0,
         artifacts: context.product.artifacts?.length || 0
       },
       activeContext: {
-        exists: await fs.pathExists(this.activeContextPath),
-        size: await fs.pathExists(this.activeContextPath) ? 
-          (await fs.stat(this.activeContextPath)).size : 0,
+        exists: activeStat.size !== -1,
+        size: activeStat.size !== -1 ? activeStat.size : 0,
         activePersonas: Object.keys(context.active.personas || {}).length
       },
       totalArtifacts: context.combined.artifacts?.length || 0,

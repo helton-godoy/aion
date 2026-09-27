@@ -202,11 +202,12 @@ class SafetyProtocol {
     const trackerPath = path.join(this.projectRoot, '.aion', 'commit-tracker.json');
     
     try {
-      if (await fs.pathExists(trackerPath)) {
-        this.commitTracker = await fs.readJSON(trackerPath);
-      }
+      // ⚡ Bolt Optimization: Optimized disk I/O by removing fs.pathExists check before fs.readJSON
+      this.commitTracker = await fs.readJSON(trackerPath);
     } catch (error) {
-      console.warn(chalk.yellow(`⚠️  Could not load commit tracker: ${error.message}`));
+      if (error.code !== 'ENOENT') {
+        console.warn(chalk.yellow(`⚠️  Could not load commit tracker: ${error.message}`));
+      }
       this.commitTracker = [];
     }
   }
@@ -278,11 +279,16 @@ class RollbackManager {
     
     const pointPath = path.join(this.rollbackPointsPath, `${commit.rollbackPoint}.json`);
     
-    if (!(await fs.pathExists(pointPath))) {
-      throw new Error(`Rollback point ${commit.rollbackPoint} not found`);
+    let rollbackPoint;
+    try {
+      // ⚡ Bolt Optimization: Using native ENOENT error instead of redundant fs.pathExists check
+      rollbackPoint = await fs.readJSON(pointPath);
+    } catch (error) {
+      if (error.code === 'ENOENT') {
+        throw new Error(`Rollback point ${commit.rollbackPoint} not found`);
+      }
+      throw error;
     }
-    
-    const rollbackPoint = await fs.readJSON(pointPath);
     
     // Restore state
     await this.restoreState(rollbackPoint.state);
@@ -301,16 +307,26 @@ class RollbackManager {
       for (const fileChange of changes.files) {
         const filePath = path.join(this.projectRoot, fileChange.path);
         
-        if (await fs.pathExists(filePath)) {
+        try {
+          // ⚡ Bolt Optimization: Combined fs.readFile and fs.stat into parallel Promise.all.
+          // Bypassed fs.pathExists requirement by gracefully catching ENOENT missing file scenarios.
+          const [content, stats] = await Promise.all([
+            fs.readFile(filePath, 'utf8'),
+            fs.stat(filePath)
+          ]);
           state.files[fileChange.path] = {
             exists: true,
-            content: await fs.readFile(filePath, 'utf8'),
-            stats: await fs.stat(filePath)
+            content,
+            stats
           };
-        } else {
-          state.files[fileChange.path] = {
-            exists: false
-          };
+        } catch (error) {
+          if (error.code === 'ENOENT') {
+            state.files[fileChange.path] = {
+              exists: false
+            };
+          } else {
+            throw error;
+          }
         }
       }
     }
