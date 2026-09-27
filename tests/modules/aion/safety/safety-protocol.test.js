@@ -130,6 +130,7 @@ describe('SafetyProtocol State Management & Utilities', () => {
 
   describe('getCommitHistory', () => {
     it('should return commit history within limit', () => {
+      // Setup commit tracker with 30 items
       safetyProtocol.commitTracker = Array(30).fill(0).map((_, i) => ({ id: i.toString() }));
       const history = safetyProtocol.getCommitHistory(10);
       expect(history).toHaveLength(10);
@@ -138,8 +139,23 @@ describe('SafetyProtocol State Management & Utilities', () => {
     });
 
     it('should default to limit 20', () => {
+      // Verify default limit behavior when size exceeds 20
       safetyProtocol.commitTracker = Array(30).fill(0).map((_, i) => ({ id: i.toString() }));
       expect(safetyProtocol.getCommitHistory()).toHaveLength(20);
+    });
+
+    it('should return empty array when commit history is empty', () => {
+      // Test edge case when commitTracker is empty
+      safetyProtocol.commitTracker = [];
+      expect(safetyProtocol.getCommitHistory()).toEqual([]);
+    });
+
+    it('should return all commits if commit history count is less than limit', () => {
+      // Test when total commits are fewer than requested limit
+      safetyProtocol.commitTracker = [{ id: '1' }, { id: '2' }];
+      const history = safetyProtocol.getCommitHistory(5);
+      expect(history).toHaveLength(2);
+      expect(history).toEqual([{ id: '1' }, { id: '2' }]);
     });
   });
 
