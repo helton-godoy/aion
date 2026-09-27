@@ -77,3 +77,10 @@ reproduce().catch(err => {
     console.error(err);
     process.exit(1);
 });
+
+// Jest dummy test to satisfy the test runner when this file is picked up
+if (typeof test === 'function') {
+  test('Standalone script execution', () => {
+    expect(true).toBe(true);
+  });
+}

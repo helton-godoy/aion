@@ -1,0 +1,3 @@
+## 2024-05-20 - Eliminating fs.pathExists anti-pattern
+**Learning:** Checking `fs.pathExists` before performing `fs.readFile` or `fs.stat` introduces redundant disk I/O operations and race conditions. Instead, we should directly attempt the operation and catch `ENOENT` errors. Additionally, independent file operations (like read and stat) can be run concurrently with `Promise.all` to further reduce disk I/O time.
+**Action:** When working with file systems in Node.js, prefer relying on OS-level error handling via `try/catch` and running non-dependent I/O operations in parallel rather than sequencing explicit checks and operations.
