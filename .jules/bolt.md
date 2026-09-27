@@ -1,0 +1,3 @@
+## 2025-02-25 - EAFP (Easier to Ask for Forgiveness than Permission) I/O Optimization
+**Learning:** Checking `fs.pathExists` before file operations like `fs.readFile` or `fs.readJSON` introduces double I/O. `fs.pathExists` effectively runs `fs.stat` under the hood. For files that usually exist (or don't), just read and catch `ENOENT` to halve the number of synchronous blocks / I/O latency.
+**Action:** Replace `if (await fs.pathExists(path)) { await fs.readFile(path) }` with `try { await fs.readFile(path) } catch (err) { if (err.code !== 'ENOENT') throw err; }`. Update corresponding Jest mock behaviors to mock `fs.readJSON.mockRejectedValue` rather than `pathExists`.
