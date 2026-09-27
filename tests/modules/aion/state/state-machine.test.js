@@ -240,4 +240,57 @@ describe('StateMachine Core', () => {
       expect(stats.artifactTypes['Spec']).toBe(1);
     });
   });
+
+  describe('notifyPersona', () => {
+    it('should log notification message to console', async () => {
+      const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+      await stateMachine.notifyPersona('PM', [{ type: 'Spec' }]);
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Notifying PM of new artifacts'));
+      consoleSpy.mockRestore();
+    });
+  });
+
+  describe('TransitionRules', () => {
+    it('should correctly evaluate transition validity, get transitions, and add transitions', () => {
+      const rules = stateMachine.transitionRules;
+      expect(rules.isValid('INIT', 'PM')).toBe(true);
+      expect(rules.isValid('INIT', 'UNKNOWN')).toBe(false);
+      expect(rules.isValid('UNKNOWN', 'PM')).toBeFalsy();
+
+      expect(rules.getValidTransitions('INIT')).toEqual(['PM', 'SYSTEM']);
+      expect(rules.getValidTransitions('UNKNOWN')).toEqual([]);
+
+      rules.addTransition('INIT', 'CUSTOM');
+      expect(rules.isValid('INIT', 'CUSTOM')).toBe(true);
+
+      rules.addTransition('NEW_ROLE', 'PM');
+      expect(rules.isValid('NEW_ROLE', 'PM')).toBe(true);
+    });
+  });
+
+  describe('formatHandoverLog last activity', () => {
+    it('should include ISO timestamp for last activity when handoverLog is non-empty', async () => {
+      stateMachine.handoverLog = [
+        {
+          timestamp: new Date('2025-01-01T12:00:00Z'),
+          from: 'INIT',
+          to: 'PM',
+          artifacts: 'Spec'
+        }
+      ];
+      await stateMachine.saveHandoverLog();
+      const writtenContent = fs.writeFile.mock.calls[0][1];
+      expect(writtenContent).toContain('2025-01-01T12:00:00.000Z');
+    });
+  });
+
+
+  describe('createHandoverLog', () => {
+    it('should call saveHandoverLog', async () => {
+      jest.spyOn(stateMachine, 'saveHandoverLog').mockResolvedValue();
+      await stateMachine.createHandoverLog();
+      expect(stateMachine.saveHandoverLog).toHaveBeenCalled();
+    });
+  });
+
 });
