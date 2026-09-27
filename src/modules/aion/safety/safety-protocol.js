@@ -202,11 +202,12 @@ class SafetyProtocol {
     const trackerPath = path.join(this.projectRoot, '.aion', 'commit-tracker.json');
     
     try {
-      if (await fs.pathExists(trackerPath)) {
-        this.commitTracker = await fs.readJSON(trackerPath);
-      }
+      // BOLT OPTIMIZATION: Avoid double I/O by directly reading and handling ENOENT
+      this.commitTracker = await fs.readJSON(trackerPath);
     } catch (error) {
-      console.warn(chalk.yellow(`⚠️  Could not load commit tracker: ${error.message}`));
+      if (error.code !== 'ENOENT') {
+        console.warn(chalk.yellow(`⚠️  Could not load commit tracker: ${error.message}`));
+      }
       this.commitTracker = [];
     }
   }
@@ -278,12 +279,17 @@ class RollbackManager {
     
     const pointPath = path.join(this.rollbackPointsPath, `${commit.rollbackPoint}.json`);
     
-    if (!(await fs.pathExists(pointPath))) {
-      throw new Error(`Rollback point ${commit.rollbackPoint} not found`);
+    let rollbackPoint;
+    try {
+      // BOLT OPTIMIZATION: Avoid double I/O by directly reading and handling ENOENT
+      rollbackPoint = await fs.readJSON(pointPath);
+    } catch (error) {
+      if (error.code === 'ENOENT') {
+        throw new Error(`Rollback point ${commit.rollbackPoint} not found`);
+      }
+      throw error;
     }
-    
-    const rollbackPoint = await fs.readJSON(pointPath);
-    
+
     // Restore state
     await this.restoreState(rollbackPoint.state);
     
@@ -296,39 +302,54 @@ class RollbackManager {
   async captureCurrentState(changes) {
     const state = {};
     
-    if (changes.files) {
+    if (changes.files && changes.files.length > 0) {
       state.files = {};
 
-      // BOLT OPTIMIZATION: Chunked parallelization of file I/O to avoid EMFILE and memory exhaustion
-      // Replaces sequential `fs.pathExists` checks which double I/O operations.
-      // We directly attempt to read/stat in parallel and handle ENOENT cleanly.
+      // Optimization: Process files in concurrent chunks to avoid EMFILE
+      // and use try/catch for ENOENT instead of fs.pathExists to reduce I/O overhead.
       const CHUNK_SIZE = 20;
-      for (let i = 0; i < changes.files.length; i += CHUNK_SIZE) {
-        const chunk = changes.files.slice(i, i + CHUNK_SIZE);
+      const files = changes.files;
+      const results = [];
+
+      for (let i = 0; i < files.length; i += CHUNK_SIZE) {
+        const chunk = files.slice(i, i + CHUNK_SIZE);
         
         const chunkResults = await Promise.all(chunk.map(async (fileChange) => {
           const filePath = path.join(this.projectRoot, fileChange.path);
           try {
+            // Optimization: Run read and stat concurrently
             const [content, stats] = await Promise.all([
               fs.readFile(filePath, 'utf8'),
               fs.stat(filePath)
             ]);
+
             return {
               path: fileChange.path,
-              data: { exists: true, content, stats }
+              data: {
+                exists: true,
+                content,
+                stats
+              }
             };
           } catch (error) {
             if (error.code === 'ENOENT') {
-              return { path: fileChange.path, data: { exists: false } };
+              return {
+                path: fileChange.path,
+                data: {
+                  exists: false
+                }
+              };
             }
             throw error;
           }
         }));
 
-        // Synchronously populate state.files to ensure deterministic key insertion order
-        for (const result of chunkResults) {
-          state.files[result.path] = result.data;
-        }
+        results.push(...chunkResults);
+      }
+
+      // Populate state.files synchronously to maintain deterministic insertion order
+      for (const result of results) {
+        state.files[result.path] = result.data;
       }
     }
     

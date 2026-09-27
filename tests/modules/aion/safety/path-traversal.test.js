@@ -77,10 +77,4 @@ reproduce().catch(err => {
     console.error(err);
     process.exit(1);
 });
-
-// Dummy test to satisfy Jest
-describe('Path Traversal Tests', () => {
-  it('should run standalone script logic', () => {
-    expect(true).toBe(true);
-  });
-});
+test('dummy', () => {});
