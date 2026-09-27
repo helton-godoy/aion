@@ -350,6 +350,32 @@ describe('SafetyProtocol Change Execution & Helper Classes', () => {
   });
 
 
+    it('should execute executeApiCall without error', async () => {
+      await expect(safetyProtocol.executeApiCall({ method: 'GET', endpoint: '/api/test' })).resolves.not.toThrow();
+    });
+
+    it('should rethrow non-ENOENT errors during rollback', async () => {
+      const commit = { rollbackPoint: 'err-rb' };
+      fs.readJSON.mockRejectedValue(new Error('Disk failure'));
+
+      await expect(safetyProtocol.rollbackManager.rollback(commit))
+        .rejects.toThrow('Disk failure');
+    });
+
+    it('should rethrow non-ENOENT errors during captureState', async () => {
+      fs.readFile.mockRejectedValue(new Error('Permission denied'));
+      const fileChanges = [{ path: 'restricted.js' }];
+
+      await expect(safetyProtocol.rollbackManager.captureCurrentState({ files: fileChanges }))
+        .rejects.toThrow('Permission denied');
+    });
+
+    it('should throw error if commit has no rollback point', async () => {
+      const commit = {};
+      await expect(safetyProtocol.rollbackManager.rollback(commit))
+        .rejects.toThrow('No rollback point available for this commit');
+    });
+
     it('should throw error when rollback point file is missing', async () => {
       const commit = { rollbackPoint: 'missing-rb' };
       fs.readJSON.mockRejectedValue(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }));
