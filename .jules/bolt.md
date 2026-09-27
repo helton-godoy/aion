@@ -1,0 +1,3 @@
+## 2025-04-23 - Optimize File System Checks
+**Learning:** Sequential disk I/O with redundant `fs.pathExists` preceding `fs.readFile` or `fs.stat` introduces unnecessary overhead and causes a bottleneck in `memory-manager.js`'s memory bank initialization.
+**Action:** Use native node `ENOENT` error handling with `try/catch` wrappers and utilize `Promise.all` with `fs.stat` methods to parallelize stat checks when possible, improving read performance.
