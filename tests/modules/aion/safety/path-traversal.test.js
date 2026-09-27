@@ -77,3 +77,9 @@ reproduce().catch(err => {
     console.error(err);
     process.exit(1);
 });
+
+describe('Dummy Test', () => {
+  it('should pass', () => {
+    expect(true).toBe(true);
+  });
+});
