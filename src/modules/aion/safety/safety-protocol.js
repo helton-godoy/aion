@@ -306,7 +306,7 @@ class RollbackManager {
   async captureCurrentState(changes) {
     const state = {};
     
-    if (changes.files) {
+    if (changes.files && changes.files.length > 0) {
       state.files = {};
 
       // BOLT OPTIMIZATION: Process files concurrently and avoid redundant pathExists checks
@@ -347,6 +347,12 @@ class RollbackManager {
         for (const res of results) {
           state.files[res.path] = res.data;
         }
+      };
+
+      // BOLT OPTIMIZATION: Use Promise.all to fetch file states in parallel rather than sequentially in a loop.
+      const fileStates = await Promise.all(changes.files.map(captureFile));
+      for (const fileState of fileStates) {
+        state.files[fileState.path] = fileState.info;
       }
     }
     
