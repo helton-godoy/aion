@@ -77,4 +77,9 @@ reproduce().catch(err => {
     console.error(err);
     process.exit(1);
 });
-it('dummy', () => {});
+
+describe('Path Traversal Dummy Test', () => {
+  it('should pass', () => {
+    expect(true).toBe(true);
+  });
+});
