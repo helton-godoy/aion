@@ -1,0 +1,3 @@
+## 2025-05-23 - [Optimizing Disk I/O with Promise.all and Error Handling]
+**Learning:** Checking for file existence (`fs.pathExists`) before executing other file operations (`fs.readFile` and `fs.stat`) introduces an unnecessary I/O bottleneck by running operations sequentially and causing race conditions. Removing `fs.pathExists` and executing `fs.readFile` and `fs.stat` concurrently within a `Promise.all` inside a try-catch block (relying on `ENOENT` for missing files) dramatically improves capture performance.
+**Action:** Always prefer handling `ENOENT` natively with parallel execution chunks for bulk file system operations instead of performing sequential existence checks.
