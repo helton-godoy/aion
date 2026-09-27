@@ -83,9 +83,8 @@ reproduce().catch(err => {
     process.exit(1);
 });
 
-// Dummy test to prevent Jest from failing when running all tests
 if (typeof test === 'function') {
-  test('Standalone script execution wrapper', () => {
+  test('dummy test to satisfy Jest', () => {
     expect(true).toBe(true);
   });
 }

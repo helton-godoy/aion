@@ -202,15 +202,12 @@ class SafetyProtocol {
     const trackerPath = path.join(this.projectRoot, '.aion', 'commit-tracker.json');
     
     try {
-      // ⚡ BOLT OPTIMIZATION: Avoid double I/O. Instead of checking pathExists then reading,
-      // just try reading and handle ENOENT error.
+      // BOLT OPTIMIZATION: Avoid double I/O check
       this.commitTracker = await fs.readJSON(trackerPath);
     } catch (error) {
-      if (error.code === 'ENOENT') {
-        this.commitTracker = [];
-        return;
+      if (error.code !== 'ENOENT') {
+        console.warn(chalk.yellow(`⚠️  Could not load commit tracker: ${error.message}`));
       }
-      console.warn(chalk.yellow(`⚠️  Could not load commit tracker: ${error.message}`));
       this.commitTracker = [];
     }
   }
@@ -284,8 +281,7 @@ class RollbackManager {
     
     let rollbackPoint;
     try {
-      // ⚡ BOLT OPTIMIZATION: Avoid double I/O. Instead of checking pathExists then reading,
-      // just try reading and handle ENOENT error.
+      // BOLT OPTIMIZATION: Avoid double I/O check
       rollbackPoint = await fs.readJSON(pointPath);
     } catch (error) {
       if (error.code === 'ENOENT') {
@@ -308,37 +304,33 @@ class RollbackManager {
     
     if (changes.files && changes.files.length > 0) {
       state.files = {};
+
+      // BOLT OPTIMIZATION: Chunked concurrent execution, parallelize I/O, skip pathExists
       const chunkSize = 20;
+      const results = [];
+
       for (let i = 0; i < changes.files.length; i += chunkSize) {
         const chunk = changes.files.slice(i, i + chunkSize);
-        
-        const results = await Promise.all(chunk.map(async (fileChange) => {
+        const chunkResults = await Promise.all(chunk.map(async (fileChange) => {
           const filePath = path.join(this.projectRoot, fileChange.path);
           try {
-            // BOLT OPTIMIZATION: Use Promise.all to fetch content and stats concurrently
-            // and avoid redundant pathExists check by handling ENOENT directly.
             const [content, stats] = await Promise.all([
               fs.readFile(filePath, 'utf8'),
               fs.stat(filePath)
             ]);
-            return { path: fileChange.path, data: { exists: true, content, stats } };
+            return { path: fileChange.path, info: { exists: true, content, stats } };
           } catch (error) {
             if (error.code === 'ENOENT') {
-              return { path: fileChange.path, data: { exists: false } };
+              return { path: fileChange.path, info: { exists: false } };
             }
             throw error;
           }
         }));
+        results.push(...chunkResults);
+      }
 
-        for (const result of results) {
-          state.files[result.path] = result.data;
-        }
-      };
-
-      // BOLT OPTIMIZATION: Use Promise.all to fetch file states in parallel rather than sequentially in a loop.
-      const fileStates = await Promise.all(changes.files.map(captureFile));
-      for (const fileState of fileStates) {
-        state.files[fileState.path] = fileState.info;
+      for (const result of results) {
+        state.files[result.path] = result.info;
       }
     }
     
