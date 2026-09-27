@@ -1,0 +1,3 @@
+## 2024-05-19 - Concurrent File Tracking Bottleneck
+**Learning:** The `captureCurrentState` method in `SafetyProtocol` originally executed `fs.pathExists`, `fs.readFile`, and `fs.stat` sequentially for every file being tracked. For large changesets, this serialized approach to disk I/O introduces a massive performance bottleneck.
+**Action:** Always batch I/O operations using chunked `Promise.all` (chunk sizes of ~20 to avoid EMFILE limits) and parallelize mutually independent operations like reading file contents and stats. Additionally, remove redundant `fs.pathExists` checks and use native `ENOENT` handling for more efficient error paths.
