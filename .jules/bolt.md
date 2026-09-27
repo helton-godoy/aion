@@ -1,3 +1,4 @@
-## 2025-06-09 - Remove TOCTOU I/O Anti-Patterns in SafetyProtocol
-**Learning:** Checking `fs.pathExists` before performing an `fs.readFile` or `fs.readJSON` results in double the filesystem operations (Time of Check vs Time of Use - TOCTOU anti-pattern). Furthermore, in a file backup context (`captureCurrentState`), running sequential file operations (`fs.pathExists`, `fs.readFile`, `fs.stat`) on an array of files bottlenecks the application significantly.
-**Action:** Always attempt the actual I/O operation (e.g., `fs.readJSON`) inside a `try/catch` block and gracefully handle the `ENOENT` code when a file is missing. For large arrays of files, utilize a chunked `Promise.all` to run operations concurrently and mitigate disk I/O latency, while adhering to `EMFILE` limits.
+
+## 2025-06-07 - [Concurrent fs-extra File State Capture]
+**Learning:** Sequential file iteration checking `fs.pathExists` followed by `fs.readFile` and `fs.stat` causes severe I/O bottlenecks in operations over arrays like git commits.
+**Action:** When capturing multiple file states, execute concurrent promises in chunks using `Promise.all` while catching `ENOENT` natively to avoid explicit existence checks. Ensure the resulting promises are iterated synchronously after resolution to maintain deterministic map/object key ordering required for hash consistency.
