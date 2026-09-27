@@ -68,12 +68,13 @@ class MemoryManager {
    */
   async loadProductContext() {
     try {
-      if (await fs.pathExists(this.productContextPath)) {
-        const content = await fs.readFile(this.productContextPath, 'utf8');
-        return this.parseMarkdownContent(content);
-      }
-      return this.getDefaultProductContext();
+      // ⚡ Bolt: Removed redundant fs.pathExists check before fs.readFile to save 1 I/O operation
+      const content = await fs.readFile(this.productContextPath, 'utf8');
+      return this.parseMarkdownContent(content);
     } catch (error) {
+      if (error.code === 'ENOENT') {
+        return this.getDefaultProductContext();
+      }
       console.warn(chalk.yellow(`⚠️  Could not load product context: ${error.message}`));
       return this.getDefaultProductContext();
     }
@@ -84,12 +85,13 @@ class MemoryManager {
    */
   async loadActiveContext() {
     try {
-      if (await fs.pathExists(this.activeContextPath)) {
-        const content = await fs.readFile(this.activeContextPath, 'utf8');
-        return this.parseMarkdownContent(content);
-      }
-      return this.getDefaultActiveContext();
+      // ⚡ Bolt: Removed redundant fs.pathExists check before fs.readFile to save 1 I/O operation
+      const content = await fs.readFile(this.activeContextPath, 'utf8');
+      return this.parseMarkdownContent(content);
     } catch (error) {
+      if (error.code === 'ENOENT') {
+        return this.getDefaultActiveContext();
+      }
       console.warn(chalk.yellow(`⚠️  Could not load active context: ${error.message}`));
       return this.getDefaultActiveContext();
     }
