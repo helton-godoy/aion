@@ -203,13 +203,15 @@ class SafetyProtocol {
     
     try {
       // BOLT OPTIMIZATION: Avoid double I/O. Instead of checking pathExists then reading,
-      // just try reading and handle ENOENT.
+      // just try to read and handle the ENOENT error.
       this.commitTracker = await fs.readJSON(trackerPath);
     } catch (error) {
-      if (error.code !== 'ENOENT') {
+      if (error.code === 'ENOENT') {
+        this.commitTracker = [];
+      } else {
         console.warn(chalk.yellow(`⚠️  Could not load commit tracker: ${error.message}`));
+        this.commitTracker = [];
       }
-      this.commitTracker = [];
     }
   }
 
@@ -282,7 +284,7 @@ class RollbackManager {
     
     let rollbackPoint;
     try {
-      // BOLT OPTIMIZATION: Avoid double I/O check
+      // BOLT OPTIMIZATION: Avoid double I/O.
       rollbackPoint = await fs.readJSON(pointPath);
     } catch (error) {
       if (error.code === 'ENOENT') {
@@ -305,21 +307,20 @@ class RollbackManager {
     
     if (changes.files && changes.files.length > 0) {
       state.files = {};
-      // ⚡ Bolt Optimization: Process files in chunks using Promise.all to maximize concurrent I/O.
-      // Removed sequential fs.pathExists checks, preferring native ENOENT handling to avoid race conditions.
-      const chunkSize = 20;
 
-      for (let i = 0; i < changes.files.length; i += chunkSize) {
-        const chunk = changes.files.slice(i, i + chunkSize);
+      // BOLT OPTIMIZATION: Process files concurrently in chunks to prevent EMFILE,
+      // and use Promise.all to fetch file content and stats simultaneously without pathExists.
+      const CHUNK_SIZE = 20;
+      for (let i = 0; i < changes.files.length; i += CHUNK_SIZE) {
+        const chunk = changes.files.slice(i, i + CHUNK_SIZE);
         
-        const results = await Promise.all(chunk.map(async (fileChange) => {
+        const chunkResults = await Promise.all(chunk.map(async (fileChange) => {
           const filePath = path.join(this.projectRoot, fileChange.path);
           try {
             const [content, stats] = await Promise.all([
               fs.readFile(filePath, 'utf8'),
               fs.stat(filePath)
             ]);
-
             return {
               path: fileChange.path,
               data: {
@@ -341,7 +342,7 @@ class RollbackManager {
           }
         }));
 
-        for (const result of results) {
+        for (const result of chunkResults) {
           state.files[result.path] = result.data;
         }
       }
