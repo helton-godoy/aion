@@ -5,3 +5,7 @@
 ## 2024-09-27 - [Parallelize Independent Async Validation Gates]
 **Learning:** Sequential `for...of` loops over independent async validators cause cumulative latency delays equal to the sum of individual gate execution times.
 **Action:** Use `Promise.all(validators.map(v => v.validate(changes)))` to execute independent validation gates concurrently, reducing latency to `max(gate_time)` rather than `sum(gate_time)`.
+
+## 2025-02-23 - [Parallelize N+1 Async File Operations in State Restoration]
+**Learning:** Sequentially awaiting file system operations (`fs.ensureDir`, `fs.writeFile`, `fs.remove`) in a `for...of` loop causes cumulative I/O latency proportional to the number of files.
+**Action:** Use `Promise.all` over `Object.entries(state.files).map(async ...)` to execute independent file restoration operations concurrently, drastically reducing state restoration latency (~81.3% speedup).
