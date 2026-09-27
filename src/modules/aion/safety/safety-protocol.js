@@ -298,20 +298,38 @@ class RollbackManager {
     
     if (changes.files) {
       state.files = {};
-      for (const fileChange of changes.files) {
-        const filePath = path.join(this.projectRoot, fileChange.path);
-        
-        if (await fs.pathExists(filePath)) {
-          state.files[fileChange.path] = {
-            exists: true,
-            content: await fs.readFile(filePath, 'utf8'),
-            stats: await fs.stat(filePath)
-          };
-        } else {
-          state.files[fileChange.path] = {
-            exists: false
-          };
-        }
+      // Bolt Optimization: Use chunked concurrency (limit 20) and try/catch instead of sequential fs.pathExists
+      const chunkSize = 20;
+      const results = [];
+
+      for (let i = 0; i < changes.files.length; i += chunkSize) {
+        const chunk = changes.files.slice(i, i + chunkSize);
+        const chunkPromises = chunk.map(async (fileChange) => {
+          const filePath = path.join(this.projectRoot, fileChange.path);
+          try {
+            // Bolt Optimization: Run readFile and stat in parallel
+            const [content, stats] = await Promise.all([
+              fs.readFile(filePath, 'utf8'),
+              fs.stat(filePath)
+            ]);
+            return {
+              path: fileChange.path,
+              data: { exists: true, content, stats }
+            };
+          } catch (error) {
+            // Bolt Optimization: Catch ENOENT directly rather than a redundant fs.pathExists check
+            if (error.code === 'ENOENT') {
+              return { path: fileChange.path, data: { exists: false } };
+            }
+            throw error;
+          }
+        });
+        results.push(...(await Promise.all(chunkPromises)));
+      }
+
+      // Bolt Optimization: Populate state synchronously to ensure deterministic key order
+      for (const result of results) {
+        state.files[result.path] = result.data;
       }
     }
     
