@@ -182,9 +182,7 @@ describe('SafetyProtocol State Management & Utilities', () => {
     });
 
     it('should initialize empty if file does not exist', async () => {
-      const enoentError = new Error('ENOENT');
-      enoentError.code = 'ENOENT';
-      fs.readJSON.mockRejectedValue(enoentError);
+      fs.readJSON.mockRejectedValue(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }));
       await safetyProtocol.loadCommitTracker();
       expect(safetyProtocol.commitTracker).toEqual([]);
     });
@@ -277,9 +275,7 @@ describe('SafetyProtocol Change Execution & Helper Classes', () => {
   describe('RollbackManager', () => {
     it('should create a rollback point', async () => {
       const changes = { files: [] };
-      const enoentError = new Error('ENOENT');
-      enoentError.code = 'ENOENT';
-      fs.readFile.mockRejectedValue(enoentError);
+      // for captureCurrentState empty files, no readFile called
 
       const pointId = await safetyProtocol.rollbackManager.createPoint(changes);
 
