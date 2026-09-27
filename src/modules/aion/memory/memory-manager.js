@@ -68,13 +68,14 @@ class MemoryManager {
    */
   async loadProductContext() {
     try {
-      if (await fs.pathExists(this.productContextPath)) {
-        const content = await fs.readFile(this.productContextPath, 'utf8');
-        return this.parseMarkdownContent(content);
-      }
-      return this.getDefaultProductContext();
+      // ⚡ Bolt Optimization: Read file directly and catch ENOENT error to eliminate redundant fs.pathExists check.
+      // Reduces disk I/O operations by 50% for this method.
+      const content = await fs.readFile(this.productContextPath, 'utf8');
+      return this.parseMarkdownContent(content);
     } catch (error) {
-      console.warn(chalk.yellow(`⚠️  Could not load product context: ${error.message}`));
+      if (error.code !== 'ENOENT') {
+        console.warn(chalk.yellow(`⚠️  Could not load product context: ${error.message}`));
+      }
       return this.getDefaultProductContext();
     }
   }
@@ -84,13 +85,14 @@ class MemoryManager {
    */
   async loadActiveContext() {
     try {
-      if (await fs.pathExists(this.activeContextPath)) {
-        const content = await fs.readFile(this.activeContextPath, 'utf8');
-        return this.parseMarkdownContent(content);
-      }
-      return this.getDefaultActiveContext();
+      // ⚡ Bolt Optimization: Read file directly and catch ENOENT error to eliminate redundant fs.pathExists check.
+      // Reduces disk I/O operations by 50% for this method.
+      const content = await fs.readFile(this.activeContextPath, 'utf8');
+      return this.parseMarkdownContent(content);
     } catch (error) {
-      console.warn(chalk.yellow(`⚠️  Could not load active context: ${error.message}`));
+      if (error.code !== 'ENOENT') {
+        console.warn(chalk.yellow(`⚠️  Could not load active context: ${error.message}`));
+      }
       return this.getDefaultActiveContext();
     }
   }
@@ -309,23 +311,31 @@ class MemoryManager {
    * Get memory bank status
    */
   async getStatus() {
-    const context = await this.getContext();
+    // ⚡ Bolt Optimization: Use Promise.allSettled to parallelize getContext and fs.stat operations.
+    // Replaces sequential fs.pathExists and fs.stat checks, reducing disk I/O bottlenecks.
+    const [context, productStatResult, activeStatResult] = await Promise.allSettled([
+      this.getContext(),
+      fs.stat(this.productContextPath),
+      fs.stat(this.activeContextPath)
+    ]);
     
+    const contextData = context.status === 'fulfilled' ? context.value : { product: {}, active: {}, combined: {} };
+    const productStat = productStatResult.status === 'fulfilled' ? productStatResult.value : null;
+    const activeStat = activeStatResult.status === 'fulfilled' ? activeStatResult.value : null;
+
     return {
       productContext: {
-        exists: await fs.pathExists(this.productContextPath),
-        size: await fs.pathExists(this.productContextPath) ? 
-          (await fs.stat(this.productContextPath)).size : 0,
-        artifacts: context.product.artifacts?.length || 0
+        exists: !!productStat,
+        size: productStat ? productStat.size : 0,
+        artifacts: contextData.product.artifacts?.length || 0
       },
       activeContext: {
-        exists: await fs.pathExists(this.activeContextPath),
-        size: await fs.pathExists(this.activeContextPath) ? 
-          (await fs.stat(this.activeContextPath)).size : 0,
-        activePersonas: Object.keys(context.active.personas || {}).length
+        exists: !!activeStat,
+        size: activeStat ? activeStat.size : 0,
+        activePersonas: Object.keys(contextData.active.personas || {}).length
       },
-      totalArtifacts: context.combined.artifacts?.length || 0,
-      lastActivity: context.active.session?.lastActivity || null
+      totalArtifacts: contextData.combined.artifacts?.length || 0,
+      lastActivity: contextData.active.session?.lastActivity || null
     };
   }
 }
