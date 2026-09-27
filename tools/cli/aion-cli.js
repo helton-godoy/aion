@@ -9,6 +9,7 @@ const chalk = require('chalk');
 const figlet = require('figlet');
 const pkg = require('../../package.json');
 const AIONInitializer = require('../aion/aion-init');
+const pkg = require('../../package.json');
 
 // Display welcome banner
 console.log(
