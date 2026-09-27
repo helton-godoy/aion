@@ -304,35 +304,47 @@ class RollbackManager {
     
     if (changes.files && changes.files.length > 0) {
       state.files = {};
-      const chunkSize = 20; // chunk to prevent EMFILE
 
-      for (let i = 0; i < changes.files.length; i += chunkSize) {
-        const chunk = changes.files.slice(i, i + chunkSize);
+      // BOLT OPTIMIZATION: Process reads in parallel chunks to prevent EMFILE and avoid redundant pathExists
+      const fileChanges = changes.files;
+      const results = [];
+      const CHUNK_SIZE = 20;
+
+      for (let i = 0; i < fileChanges.length; i += CHUNK_SIZE) {
+        const chunk = fileChanges.slice(i, i + CHUNK_SIZE);
         
-        // Optimistic concurrent reads instead of sequential pathExists
-        const results = await Promise.all(chunk.map(async (fileChange) => {
+        const chunkPromises = chunk.map(async (fileChange) => {
           const filePath = path.join(this.projectRoot, fileChange.path);
+
           try {
+            // Execute readFile and stat concurrently
             const [content, stats] = await Promise.all([
               fs.readFile(filePath, 'utf8'),
               fs.stat(filePath)
             ]);
+
             return {
               path: fileChange.path,
               data: { exists: true, content, stats }
             };
           } catch (error) {
             if (error.code === 'ENOENT') {
-              return { path: fileChange.path, data: { exists: false } };
+              return {
+                path: fileChange.path,
+                data: { exists: false }
+              };
             }
             throw error;
           }
-        }));
+        });
 
-        // Populate synchronously to ensure deterministic key order
-        for (const result of results) {
-          state.files[result.path] = result.data;
-        }
+        const chunkResults = await Promise.all(chunkPromises);
+        results.push(...chunkResults);
+      }
+
+      // Populate state deterministically
+      for (const result of results) {
+        state.files[result.path] = result.data;
       }
     }
     

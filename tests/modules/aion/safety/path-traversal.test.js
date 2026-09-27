@@ -96,9 +96,9 @@ reproduce().catch(err => {
     process.exit(1);
 });
 
-// Dummy test block to prevent Jest failure while keeping standalone capability
+// Dummy test block to prevent Jest from failing when running the test suite
 if (typeof test === 'function') {
-  test('Standalone path traversal tests execution', () => {
+  test('Standalone script execution check', () => {
     expect(true).toBe(true);
   });
 }
