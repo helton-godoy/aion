@@ -1,0 +1,3 @@
+## 2025-02-20 - Optimizing captureCurrentState I/O Performance
+**Learning:** In Node.js, checking `fs.pathExists` before performing `fs.readFile` and `fs.stat` is an anti-pattern known as "checking before doing". This results in unnecessary file system roundtrips and doesn't prevent a race condition if the file is deleted immediately after the check.
+**Action:** Prefer "asking for forgiveness, not permission" by performing I/O operations directly and handling native `ENOENT` error codes using `try-catch` blocks. Additionally, use `Promise.all` when querying multiple file properties or reading contents simultaneously to parallelize disk operations.
