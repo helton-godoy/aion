@@ -308,47 +308,29 @@ class RollbackManager {
     
     if (changes.files && changes.files.length > 0) {
       state.files = {};
-
-      // BOLT OPTIMIZATION: Process file captures concurrently in chunks to improve I/O performance
-      // while preventing EMFILE (too many open files) errors for large commits.
-      // Avoids fs.pathExists by handling ENOENT directly to save unnecessary I/O operations.
-      const CHUNK_SIZE = 20;
-      for (let i = 0; i < changes.files.length; i += CHUNK_SIZE) {
-        const chunk = changes.files.slice(i, i + CHUNK_SIZE);
+      const chunkSize = 20;
+      for (let i = 0; i < changes.files.length; i += chunkSize) {
+        const chunk = changes.files.slice(i, i + chunkSize);
         
-        const chunkResults = await Promise.all(chunk.map(async (fileChange) => {
+        const results = await Promise.all(chunk.map(async (fileChange) => {
           const filePath = path.join(this.projectRoot, fileChange.path);
-
           try {
-            // Run read and stat concurrently
+            // BOLT OPTIMIZATION: Use Promise.all to fetch content and stats concurrently
+            // and avoid redundant pathExists check by handling ENOENT directly.
             const [content, stats] = await Promise.all([
               fs.readFile(filePath, 'utf8'),
               fs.stat(filePath)
             ]);
-
-            return {
-              path: fileChange.path,
-              data: {
-                exists: true,
-                content,
-                stats
-              }
-            };
+            return { path: fileChange.path, data: { exists: true, content, stats } };
           } catch (error) {
             if (error.code === 'ENOENT') {
-              return {
-                path: fileChange.path,
-                data: {
-                  exists: false
-                }
-              };
+              return { path: fileChange.path, data: { exists: false } };
             }
             throw error;
           }
         }));
 
-        // Synchronously populate state object to ensure deterministic key insertion order
-        for (const result of chunkResults) {
+        for (const result of results) {
           state.files[result.path] = result.data;
         }
       };

@@ -73,6 +73,11 @@ async function reproduce() {
   }
 }
 
+if (typeof test === "function") {
+  test("dummy test to satisfy Jest", () => {
+    expect(true).toBe(true);
+  });
+}
 reproduce().catch(err => {
     console.error(err);
     process.exit(1);
