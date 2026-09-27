@@ -341,7 +341,7 @@ class RollbackManager {
    */
   async restoreState(state) {
     if (state.files) {
-      for (const [filePath, fileInfo] of Object.entries(state.files)) {
+      const filePromises = Object.entries(state.files).map(async ([filePath, fileInfo]) => {
         const fullPath = path.join(this.projectRoot, filePath);
         
         if (fileInfo.exists) {
@@ -350,7 +350,9 @@ class RollbackManager {
         } else {
           await fs.remove(fullPath);
         }
-      }
+      });
+
+      await Promise.all(filePromises);
     }
   }
 
