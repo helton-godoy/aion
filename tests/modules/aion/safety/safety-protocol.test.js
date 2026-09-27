@@ -174,7 +174,6 @@ describe('SafetyProtocol State Management & Utilities', () => {
   describe('loadCommitTracker', () => {
     it('should load commit tracker if file exists', async () => {
       const trackerData = [{ id: '1' }];
-      fs.pathExists.mockResolvedValue(true);
       fs.readJSON.mockResolvedValue(trackerData);
 
       await safetyProtocol.loadCommitTracker();
@@ -183,13 +182,15 @@ describe('SafetyProtocol State Management & Utilities', () => {
     });
 
     it('should initialize empty if file does not exist', async () => {
-      fs.pathExists.mockResolvedValue(false);
+      const enoentError = new Error('ENOENT');
+      enoentError.code = 'ENOENT';
+      fs.readJSON.mockRejectedValue(enoentError);
+
       await safetyProtocol.loadCommitTracker();
       expect(safetyProtocol.commitTracker).toEqual([]);
     });
 
     it('should handle load error gracefully', async () => {
-      fs.pathExists.mockResolvedValue(true);
       fs.readJSON.mockRejectedValue(new Error('Load error'));
 
       await safetyProtocol.loadCommitTracker();
@@ -277,7 +278,6 @@ describe('SafetyProtocol Change Execution & Helper Classes', () => {
   describe('RollbackManager', () => {
     it('should create a rollback point', async () => {
       const changes = { files: [] };
-      fs.pathExists.mockResolvedValue(false); // for captureCurrentState
 
       const pointId = await safetyProtocol.rollbackManager.createPoint(changes);
 
@@ -287,10 +287,26 @@ describe('SafetyProtocol Change Execution & Helper Classes', () => {
     });
 
     it('should capture current state during createPoint', async () => {
-      const changes = { files: [{ path: 'existing.js' }] };
-      fs.pathExists.mockResolvedValue(true);
-      fs.readFile.mockResolvedValue('old content');
-      fs.stat.mockResolvedValue({ size: 100 });
+      const changes = { files: [{ path: 'existing.js' }, { path: 'missing.js' }] };
+
+      // Simulate file reads. The first resolves, the second rejects with ENOENT.
+      fs.readFile.mockImplementation(async (filePath) => {
+        if (filePath.includes('missing.js')) {
+          const err = new Error('ENOENT');
+          err.code = 'ENOENT';
+          throw err;
+        }
+        return 'old content';
+      });
+
+      fs.stat.mockImplementation(async (filePath) => {
+        if (filePath.includes('missing.js')) {
+          const err = new Error('ENOENT');
+          err.code = 'ENOENT';
+          throw err;
+        }
+        return { size: 100 };
+      });
 
       const pointId = await safetyProtocol.rollbackManager.createPoint(changes);
 
@@ -300,6 +316,9 @@ describe('SafetyProtocol Change Execution & Helper Classes', () => {
         exists: true,
         content: 'old content',
         stats: { size: 100 }
+      });
+      expect(savedPoint.state.files['missing.js']).toEqual({
+        exists: false
       });
     });
 
