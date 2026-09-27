@@ -182,9 +182,7 @@ describe('SafetyProtocol State Management & Utilities', () => {
     });
 
     it('should initialize empty if file does not exist', async () => {
-      const error = new Error('ENOENT');
-      error.code = 'ENOENT';
-      fs.readJSON.mockRejectedValue(error);
+      fs.readJSON.mockRejectedValue(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }));
       await safetyProtocol.loadCommitTracker();
       expect(safetyProtocol.commitTracker).toEqual([]);
     });
@@ -310,6 +308,19 @@ describe('SafetyProtocol Change Execution & Helper Classes', () => {
       enoentError.code = 'ENOENT';
       fs.readFile.mockRejectedValue(enoentError);
       fs.stat.mockRejectedValue(enoentError);
+
+      await safetyProtocol.rollbackManager.createPoint(changes);
+
+      const callArgs = fs.writeJSON.mock.calls[0];
+      const savedPoint = callArgs[1];
+      expect(savedPoint.state.files['missing.js']).toEqual({
+        exists: false
+      });
+    });
+
+    it('should capture current state when file is missing', async () => {
+      const changes = { files: [{ path: 'missing.js' }] };
+      fs.readFile.mockRejectedValue(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }));
 
       await safetyProtocol.rollbackManager.createPoint(changes);
 

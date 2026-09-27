@@ -202,7 +202,8 @@ class SafetyProtocol {
     const trackerPath = path.join(this.projectRoot, '.aion', 'commit-tracker.json');
     
     try {
-      // BOLT OPTIMIZATION: Avoid double I/O check
+      // BOLT OPTIMIZATION: Avoid double I/O. Instead of checking pathExists then reading,
+      // just try reading and handle ENOENT.
       this.commitTracker = await fs.readJSON(trackerPath);
     } catch (error) {
       if (error.code !== 'ENOENT') {
@@ -304,16 +305,15 @@ class RollbackManager {
     
     if (changes.files && changes.files.length > 0) {
       state.files = {};
-      const chunkSize = 20;
 
+      // BOLT OPTIMIZATION: Process files concurrently in chunks, avoiding pathExists
+      const chunkSize = 20;
       for (let i = 0; i < changes.files.length; i += chunkSize) {
         const chunk = changes.files.slice(i, i + chunkSize);
         
         const chunkResults = await Promise.all(chunk.map(async (fileChange) => {
           const filePath = path.join(this.projectRoot, fileChange.path);
           try {
-            // BOLT OPTIMIZATION: Consolidate file operations using concurrent readFile and stat calls
-            // wrapped in try-catch to handle ENOENT. This avoids a separate pathExists I/O operation.
             const [content, stats] = await Promise.all([
               fs.readFile(filePath, 'utf8'),
               fs.stat(filePath)
