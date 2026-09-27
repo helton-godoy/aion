@@ -68,13 +68,12 @@ class MemoryManager {
    */
   async loadProductContext() {
     try {
-      if (await fs.pathExists(this.productContextPath)) {
-        const content = await fs.readFile(this.productContextPath, 'utf8');
-        return this.parseMarkdownContent(content);
-      }
-      return this.getDefaultProductContext();
+      const content = await fs.readFile(this.productContextPath, 'utf8');
+      return this.parseMarkdownContent(content);
     } catch (error) {
-      console.warn(chalk.yellow(`⚠️  Could not load product context: ${error.message}`));
+      if (error.code !== 'ENOENT') {
+        console.warn(chalk.yellow(`⚠️  Could not load product context: ${error.message}`));
+      }
       return this.getDefaultProductContext();
     }
   }
@@ -84,13 +83,12 @@ class MemoryManager {
    */
   async loadActiveContext() {
     try {
-      if (await fs.pathExists(this.activeContextPath)) {
-        const content = await fs.readFile(this.activeContextPath, 'utf8');
-        return this.parseMarkdownContent(content);
-      }
-      return this.getDefaultActiveContext();
+      const content = await fs.readFile(this.activeContextPath, 'utf8');
+      return this.parseMarkdownContent(content);
     } catch (error) {
-      console.warn(chalk.yellow(`⚠️  Could not load active context: ${error.message}`));
+      if (error.code !== 'ENOENT') {
+        console.warn(chalk.yellow(`⚠️  Could not load active context: ${error.message}`));
+      }
       return this.getDefaultActiveContext();
     }
   }
@@ -311,17 +309,35 @@ class MemoryManager {
   async getStatus() {
     const context = await this.getContext();
     
+    let productContextExists = false;
+    let productContextSize = 0;
+    try {
+      const stats = await fs.stat(this.productContextPath);
+      productContextExists = true;
+      productContextSize = stats.size;
+    } catch (e) {
+      // Ignore ENOENT
+    }
+
+    let activeContextExists = false;
+    let activeContextSize = 0;
+    try {
+      const stats = await fs.stat(this.activeContextPath);
+      activeContextExists = true;
+      activeContextSize = stats.size;
+    } catch (e) {
+      // Ignore ENOENT
+    }
+
     return {
       productContext: {
-        exists: await fs.pathExists(this.productContextPath),
-        size: await fs.pathExists(this.productContextPath) ? 
-          (await fs.stat(this.productContextPath)).size : 0,
+        exists: productContextExists,
+        size: productContextSize,
         artifacts: context.product.artifacts?.length || 0
       },
       activeContext: {
-        exists: await fs.pathExists(this.activeContextPath),
-        size: await fs.pathExists(this.activeContextPath) ? 
-          (await fs.stat(this.activeContextPath)).size : 0,
+        exists: activeContextExists,
+        size: activeContextSize,
         activePersonas: Object.keys(context.active.personas || {}).length
       },
       totalArtifacts: context.combined.artifacts?.length || 0,
