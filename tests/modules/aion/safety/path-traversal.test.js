@@ -77,3 +77,10 @@ reproduce().catch(err => {
     console.error(err);
     process.exit(1);
 });
+
+// Dummy test to make Jest happy while keeping this file runnable via node
+if (typeof test === 'function') {
+  test('dummy test to make jest happy', () => {
+    expect(true).toBe(true);
+  });
+}

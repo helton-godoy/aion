@@ -306,7 +306,7 @@ class RollbackManager {
   async captureCurrentState(changes) {
     const state = {};
     
-    if (changes.files) {
+    if (changes.files && changes.files.length > 0) {
       state.files = {};
       // ⚡ BOLT OPTIMIZATION: Process files concurrently in chunks to prevent EMFILE errors,
       // collect promises, and avoid double I/O by executing readFile and stat concurrently
@@ -337,6 +337,12 @@ class RollbackManager {
         for (const result of results) {
           state.files[result.path] = result.info;
         }
+      };
+
+      // BOLT OPTIMIZATION: Use Promise.all to fetch file states in parallel rather than sequentially in a loop.
+      const fileStates = await Promise.all(changes.files.map(captureFile));
+      for (const fileState of fileStates) {
+        state.files[fileState.path] = fileState.info;
       }
     }
     
