@@ -202,11 +202,11 @@ class SafetyProtocol {
     const trackerPath = path.join(this.projectRoot, '.aion', 'commit-tracker.json');
     
     try {
-      if (await fs.pathExists(trackerPath)) {
-        this.commitTracker = await fs.readJSON(trackerPath);
-      }
+      this.commitTracker = await fs.readJSON(trackerPath);
     } catch (error) {
-      console.warn(chalk.yellow(`⚠️  Could not load commit tracker: ${error.message}`));
+      if (error.code !== 'ENOENT') {
+        console.warn(chalk.yellow(`⚠️  Could not load commit tracker: ${error.message}`));
+      }
       this.commitTracker = [];
     }
   }
@@ -278,16 +278,19 @@ class RollbackManager {
     
     const pointPath = path.join(this.rollbackPointsPath, `${commit.rollbackPoint}.json`);
     
-    if (!(await fs.pathExists(pointPath))) {
-      throw new Error(`Rollback point ${commit.rollbackPoint} not found`);
+    try {
+      const rollbackPoint = await fs.readJSON(pointPath);
+
+      // Restore state
+      await this.restoreState(rollbackPoint.state);
+
+      return rollbackPoint;
+    } catch (error) {
+      if (error.code === 'ENOENT') {
+        throw new Error(`Rollback point ${commit.rollbackPoint} not found`);
+      }
+      throw error;
     }
-    
-    const rollbackPoint = await fs.readJSON(pointPath);
-    
-    // Restore state
-    await this.restoreState(rollbackPoint.state);
-    
-    return rollbackPoint;
   }
 
   /**
@@ -298,20 +301,35 @@ class RollbackManager {
     
     if (changes.files) {
       state.files = {};
-      for (const fileChange of changes.files) {
+
+      // Process file changes concurrently
+      const filePromises = changes.files.map(async (fileChange) => {
         const filePath = path.join(this.projectRoot, fileChange.path);
-        
-        if (await fs.pathExists(filePath)) {
-          state.files[fileChange.path] = {
-            exists: true,
-            content: await fs.readFile(filePath, 'utf8'),
-            stats: await fs.stat(filePath)
+        try {
+          const [content, stats] = await Promise.all([
+            fs.readFile(filePath, 'utf8'),
+            fs.stat(filePath)
+          ]);
+          return {
+            path: fileChange.path,
+            info: { exists: true, content, stats }
           };
-        } else {
-          state.files[fileChange.path] = {
-            exists: false
-          };
+        } catch (error) {
+          if (error.code === 'ENOENT') {
+            return {
+              path: fileChange.path,
+              info: { exists: false }
+            };
+          }
+          throw error;
         }
+      });
+
+      const results = await Promise.all(filePromises);
+
+      // Re-assign sequentially to maintain order and deterministic structure
+      for (const result of results) {
+        state.files[result.path] = result.info;
       }
     }
     
