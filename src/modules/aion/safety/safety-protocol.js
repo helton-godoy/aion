@@ -305,16 +305,19 @@ class RollbackManager {
     
     if (changes.files && changes.files.length > 0) {
       state.files = {};
-      // BOLT OPTIMIZATION: Process files concurrently in chunks to prevent EMFILE errors
-      // and avoid double I/O from pathExists by using try-catch for ENOENT.
-      const CHUNK_SIZE = 20;
-      for (let i = 0; i < changes.files.length; i += CHUNK_SIZE) {
-        const chunk = changes.files.slice(i, i + CHUNK_SIZE);
+
+      // Chunk processing to avoid EMFILE
+      const chunkSize = 20;
+      for (let i = 0; i < changes.files.length; i += chunkSize) {
+        const chunk = changes.files.slice(i, i + chunkSize);
         
+        // Process chunk concurrently
         const results = await Promise.all(chunk.map(async (fileChange) => {
           const filePath = path.join(this.projectRoot, fileChange.path);
+
           try {
-            // Run read and stat concurrently
+            // BOLT OPTIMIZATION: Avoid fs.pathExists check, rely on ENOENT instead,
+            // and execute readFile and stat concurrently to optimize disk I/O
             const [content, stats] = await Promise.all([
               fs.readFile(filePath, 'utf8'),
               fs.stat(filePath)
@@ -322,20 +325,26 @@ class RollbackManager {
 
             return {
               path: fileChange.path,
-              data: { exists: true, content, stats }
+              data: {
+                exists: true,
+                content: content,
+                stats: stats
+              }
             };
           } catch (error) {
             if (error.code === 'ENOENT') {
               return {
                 path: fileChange.path,
-                data: { exists: false }
+                data: {
+                  exists: false
+                }
               };
             }
             throw error;
           }
         }));
 
-        // Populate state synchronously to preserve deterministic order
+        // Sync populate to maintain deterministic insertion order
         for (const result of results) {
           state.files[result.path] = result.data;
         }

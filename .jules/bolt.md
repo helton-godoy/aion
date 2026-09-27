@@ -1,3 +1,3 @@
-## 2025-05-25 - Promise.all Map Ordering Safety
-**Learning:** When executing I/O concurrently using `Promise.all(array.map(...))` and dynamically assigning to a state object based on file path resolution order, the assignment order becomes non-deterministic based on whichever promise resolves first. This can lead to unpredictable test assertions or snapshot differences.
-**Action:** Resolve the concurrent promises to an array of results first, then synchronously iterate over that array to populate the target object, preserving the original array order.
+## 2024-05-24 - Optimize Disk I/O with Concurrent Error Handling
+**Learning:** Sequential fs operations (pathExists, then readFile/stat) create significant bottlenecks in Node.js apps handling numerous files.
+**Action:** When performing file system tasks over multiple files, eliminate proactive `fs.pathExists` checks. Instead, execute the core operations (`fs.readFile`, `fs.stat`) concurrently with chunked `Promise.all` blocks to avoid EMFILE limits, and rely on catching `ENOENT` natively to determine existence. Ensure state maps are synchronously populated after resolving the promises to maintain exact insertion order.
