@@ -380,9 +380,8 @@ class ValidationGates {
   async validate(changes) {
     console.log(chalk.blue('🔍 Running validation gates...'));
     
-    for (const validator of this.validators) {
-      await validator.validate(changes);
-    }
+    // Run independent validation gates concurrently to minimize total validation latency
+    await Promise.all(this.validators.map(validator => validator.validate(changes)));
     
     console.log(chalk.green('✅ All validation gates passed'));
   }
