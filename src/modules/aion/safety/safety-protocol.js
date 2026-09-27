@@ -202,8 +202,7 @@ class SafetyProtocol {
     const trackerPath = path.join(this.projectRoot, '.aion', 'commit-tracker.json');
     
     try {
-      // ⚡ Bolt: Removed fs.pathExists check to save an IO operation.
-      // We rely on fs.readJSON throwing ENOENT natively if the file is missing.
+      // BOLT OPTIMIZATION: Avoid double I/O. Try reading directly and catch ENOENT.
       this.commitTracker = await fs.readJSON(trackerPath);
     } catch (error) {
       if (error.code !== 'ENOENT') {
@@ -282,8 +281,7 @@ class RollbackManager {
     
     let rollbackPoint;
     try {
-      // ⚡ Bolt: Removed fs.pathExists check to save an IO operation.
-      // We rely on fs.readJSON throwing ENOENT natively if the file is missing.
+      // BOLT OPTIMIZATION: Avoid double I/O. Try reading directly and catch ENOENT.
       rollbackPoint = await fs.readJSON(pointPath);
     } catch (error) {
       if (error.code === 'ENOENT') {
@@ -306,46 +304,35 @@ class RollbackManager {
     
     if (changes.files && changes.files.length > 0) {
       state.files = {};
-      // BOLT OPTIMIZATION: Process files in parallel chunks of 20 to avoid EMFILE errors
-      const chunks = [];
-      const chunkSize = 20;
-      for (let i = 0; i < changes.files.length; i += chunkSize) {
-        chunks.push(changes.files.slice(i, i + chunkSize));
-      }
 
-      for (const chunk of chunks) {
-        // BOLT OPTIMIZATION: Process chunk concurrently and collect results before updating state to maintain deterministic order
-        const results = await Promise.all(chunk.map(async (fileChange) => {
-          const filePath = path.join(this.projectRoot, fileChange.path);
-          try {
-            // BOLT OPTIMIZATION: Avoid double I/O (fs.pathExists + fs.readFile/stat).
-            // Run readFile and stat in parallel and handle ENOENT natively.
-            const [content, stats] = await Promise.all([
-              fs.readFile(filePath, 'utf8'),
-              fs.stat(filePath)
-            ]);
+      // BOLT OPTIMIZATION: Process files concurrently using Promise.all
+      // and avoid double I/O (fs.pathExists followed by readFile/stat)
+      // by directly trying to read/stat and handling ENOENT.
+      const getFileInfo = async (fileChange) => {
+        const filePath = path.join(this.projectRoot, fileChange.path);
+        try {
+          const [content, stats] = await Promise.all([
+            fs.readFile(filePath, 'utf8'),
+            fs.stat(filePath)
+          ]);
+          return {
+            path: fileChange.path,
+            info: { exists: true, content, stats }
+          };
+        } catch (error) {
+          if (error.code === 'ENOENT') {
             return {
               path: fileChange.path,
-              data: {
-                exists: true,
-                content,
-                stats
-              }
+              info: { exists: false }
             };
-          } catch (error) {
-            if (error.code === 'ENOENT') {
-              return {
-                path: fileChange.path,
-                data: { exists: false }
-              };
-            }
-            throw error;
           }
-        }));
-
-        for (const result of results) {
-          state.files[result.path] = result.data;
+          throw error;
         }
+      };
+
+      const results = await Promise.all(changes.files.map(getFileInfo));
+      for (const result of results) {
+        state.files[result.path] = result.info;
       }
     }
     

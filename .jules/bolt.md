@@ -1,3 +1,1 @@
-## 2023-10-24 - Avoiding Double I/O and Chunked Promise execution for File State capture
-**Learning:** In scenarios requiring tracking of multiple files' states, running a combination of `fs.pathExists` followed by `fs.readFile` and `fs.stat` causes double I/O. It's more efficient to run `fs.readFile` and `fs.stat` concurrently using `Promise.all` and handle the resulting `ENOENT` error to infer existence. Additionally, using unbound concurrent `Promise.all` for processing large arrays of files can result in EMFILE errors.
-**Action:** Always prefer handling `ENOENT` errors over `fs.pathExists` checks for bulk file operations. When working with large arrays of file modifications, chunk the workload (e.g., in sizes of 20) and await each chunk's completion sequentially before moving onto the next, and ensure deterministic order by populating state objects synchronously at the end.
+## 2024-06-25 - [Placeholder]
