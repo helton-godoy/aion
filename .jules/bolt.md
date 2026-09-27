@@ -1,0 +1,3 @@
+## 2024-05-24 - Deterministic State Ordering with Promise.all
+**Learning:** When refactoring sequential file iteration to concurrent chunks (e.g. `Promise.all` over files) for performance, directly assigning to an object inside the asynchronous `map` callback can lead to non-deterministic key ordering. Object keys will be inserted in the order the OS resolves the I/O, not the original array order. This can cause subtle bugs if the object state is later iterated, hashed, or compared.
+**Action:** When migrating from sequential loops to `Promise.all` chunks, always return the processed data from the inner promises to form an array of results. Then, synchronously iterate over that resulting array to populate the state object, preserving deterministic key insertion order.
