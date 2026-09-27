@@ -183,13 +183,12 @@ describe('SafetyProtocol State Management & Utilities', () => {
     });
 
     it('should initialize empty if file does not exist', async () => {
-      fs.pathExists.mockResolvedValue(false);
+      fs.readJSON.mockRejectedValue(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }));
       await safetyProtocol.loadCommitTracker();
       expect(safetyProtocol.commitTracker).toEqual([]);
     });
 
     it('should handle load error gracefully', async () => {
-      fs.pathExists.mockResolvedValue(true);
       fs.readJSON.mockRejectedValue(new Error('Load error'));
 
       await safetyProtocol.loadCommitTracker();
