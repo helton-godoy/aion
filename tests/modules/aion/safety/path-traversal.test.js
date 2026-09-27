@@ -78,9 +78,6 @@ reproduce().catch(err => {
     process.exit(1);
 });
 
-// Dummy test block to satisfy Jest test runner requirements
 if (typeof test === 'function') {
-  test('Standalone script execution', () => {
-    expect(true).toBe(true);
-  });
+  test('Dummy test to satisfy Jest', () => { expect(true).toBe(true); });
 }

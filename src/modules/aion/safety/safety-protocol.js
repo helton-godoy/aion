@@ -202,7 +202,8 @@ class SafetyProtocol {
     const trackerPath = path.join(this.projectRoot, '.aion', 'commit-tracker.json');
     
     try {
-      // ⚡ Bolt: Optimize I/O by removing redundant pathExists check before readJSON.
+      // BOLT OPTIMIZATION: Avoid double I/O. Instead of checking pathExists then reading,
+      // just try reading and handle ENOENT.
       this.commitTracker = await fs.readJSON(trackerPath);
     } catch (error) {
       if (error.code === 'ENOENT') {
@@ -306,30 +307,41 @@ class RollbackManager {
     
     if (changes.files && changes.files.length > 0) {
       state.files = {};
-      // ⚡ Bolt: Optimize I/O by chunking concurrent operations (prevent EMFILE),
-      // parallelizing read/stat, and avoiding redundant pathExists checks.
+      // BOLT OPTIMIZATION: Avoid double I/O. Instead of checking pathExists then reading/stat,
+      // use Promise.all to fetch both simultaneously and handle ENOENT.
+      // Used chunked Promise.all to prevent EMFILE errors with large numbers of files.
       const CHUNK_SIZE = 20;
       for (let i = 0; i < changes.files.length; i += CHUNK_SIZE) {
         const chunk = changes.files.slice(i, i + CHUNK_SIZE);
-        
-        const results = await Promise.all(chunk.map(async (fileChange) => {
+        const promises = chunk.map(async (fileChange) => {
           const filePath = path.join(this.projectRoot, fileChange.path);
           try {
             const [content, stats] = await Promise.all([
               fs.readFile(filePath, 'utf8'),
               fs.stat(filePath)
             ]);
-            return { path: fileChange.path, info: { exists: true, content, stats } };
+            return {
+              path: fileChange.path,
+              data: {
+                exists: true,
+                content,
+                stats
+              }
+            };
           } catch (error) {
             if (error.code === 'ENOENT') {
-              return { path: fileChange.path, info: { exists: false } };
+              return {
+                path: fileChange.path,
+                data: { exists: false }
+              };
             }
             throw error;
           }
-        }));
-
-        for (const { path, info } of results) {
-          state.files[path] = info;
+        });
+        
+        const results = await Promise.all(promises);
+        for (const result of results) {
+          state.files[result.path] = result.data;
         }
       };
 
