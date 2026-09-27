@@ -78,9 +78,8 @@ reproduce().catch(err => {
     process.exit(1);
 });
 
-// Dummy Jest test to prevent suite failure
 if (typeof test === 'function') {
-  test('standalone test script', () => {
+  test('dummy test to satisfy Jest', () => {
     expect(true).toBe(true);
   });
 }

@@ -306,45 +306,34 @@ class RollbackManager {
     
     if (changes.files && changes.files.length > 0) {
       state.files = {};
-      // BOLT OPTIMIZATION: Process files in chunks using Promise.all to avoid EMFILE errors
-      // and parallelize I/O operations (fs.readFile and fs.stat) instead of sequential execution.
-      // Also avoiding redundant fs.pathExists checks, instead relying on try/catch to handle ENOENT directly.
-      const chunkSize = 20;
-      for (let i = 0; i < changes.files.length; i += chunkSize) {
-        const chunk = changes.files.slice(i, i + chunkSize);
-        
-        const chunkResults = await Promise.all(chunk.map(async (fileChange) => {
-          const filePath = path.join(this.projectRoot, fileChange.path);
-          try {
-            const [content, stats] = await Promise.all([
-              fs.readFile(filePath, 'utf8'),
-              fs.stat(filePath)
-            ]);
+
+      // BOLT OPTIMIZATION: Concurrently read file and stats, and catch ENOENT to avoid redundant fs.pathExists check.
+      const captureFile = async (fileChange) => {
+        const filePath = path.join(this.projectRoot, fileChange.path);
+        try {
+          const [content, stats] = await Promise.all([
+            fs.readFile(filePath, 'utf8'),
+            fs.stat(filePath)
+          ]);
+          return {
+            path: fileChange.path,
+            info: { exists: true, content, stats }
+          };
+        } catch (error) {
+          if (error.code === 'ENOENT') {
             return {
               path: fileChange.path,
-              data: {
-                exists: true,
-                content,
-                stats
-              }
+              info: { exists: false }
             };
-          } catch (error) {
-            if (error.code === 'ENOENT') {
-              return {
-                path: fileChange.path,
-                data: {
-                  exists: false
-                }
-              };
-            }
-            throw error;
           }
-        }));
-
-        // Synchronously populate state.files to ensure deterministic order
-        for (const result of chunkResults) {
-          state.files[result.path] = result.data;
+          throw error;
         }
+      };
+
+      // BOLT OPTIMIZATION: Use Promise.all to fetch file states in parallel rather than sequentially in a loop.
+      const fileStates = await Promise.all(changes.files.map(captureFile));
+      for (const fileState of fileStates) {
+        state.files[fileState.path] = fileState.info;
       }
     }
     
