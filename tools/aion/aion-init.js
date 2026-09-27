@@ -107,12 +107,11 @@ class AIONInitializer {
     try {
       const aionModulesPath = path.join(this.aionPath, 'src/modules/aion');
       
-      // Create AION module structure
+      // Create AION module structure concurrently using Promise.all to optimize directory creation performance
       const modules = ['agents', 'workflows', 'memory', 'state', 'safety', 'platform'];
-      
-      for (const module of modules) {
-        await fs.ensureDir(path.join(aionModulesPath, module));
-      }
+      await Promise.all(
+        modules.map((module) => fs.ensureDir(path.join(aionModulesPath, module)))
+      );
 
       // Create basic module files
       await this.createBasicModules();
