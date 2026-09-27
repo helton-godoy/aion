@@ -1,0 +1,3 @@
+## 2024-06-16 - I/O Parallelization and Error Handling Optimization
+**Learning:** Checking `fs.pathExists` before running `fs.readFile` or `fs.stat` introduces unnecessary and redundant I/O overhead. Furthermore, for operations scaling with array size, sequential processing is a bottleneck.
+**Action:** Use chunked `Promise.all` (to avoid EMFILE memory exhaustion) for bulk file operations, parallelizing read/stat operations. Wrap them in `try/catch` and natively handle the `ENOENT` error directly instead of performing the redundant upfront existence check. Synchronously populate object states from the array of promises afterwards to guarantee deterministic insertion order.
