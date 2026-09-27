@@ -1,3 +1,3 @@
-## 2024-10-24 - [Over-broad Error Catching in Promise.all]
-**Learning:** When using `try/catch` with concurrent file operations (like `Promise.all([fs.readFile, fs.stat])`) to handle expected missing files (`ENOENT`), catching all errors silently masks genuine failures like `EACCES` (permission denied) or `EISDIR` (is a directory), which can corrupt safety module state representations.
-**Action:** Always explicitly check for `error.code === 'ENOENT'` inside catch blocks when optimizing I/O. If the error is not `ENOENT`, the error must be re-thrown to avoid silent corruption.
+## 2025-06-09 - Remove TOCTOU I/O Anti-Patterns in SafetyProtocol
+**Learning:** Checking `fs.pathExists` before performing an `fs.readFile` or `fs.readJSON` results in double the filesystem operations (Time of Check vs Time of Use - TOCTOU anti-pattern). Furthermore, in a file backup context (`captureCurrentState`), running sequential file operations (`fs.pathExists`, `fs.readFile`, `fs.stat`) on an array of files bottlenecks the application significantly.
+**Action:** Always attempt the actual I/O operation (e.g., `fs.readJSON`) inside a `try/catch` block and gracefully handle the `ENOENT` code when a file is missing. For large arrays of files, utilize a chunked `Promise.all` to run operations concurrently and mitigate disk I/O latency, while adhering to `EMFILE` limits.

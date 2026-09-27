@@ -284,7 +284,8 @@ class RollbackManager {
     
     let rollbackPoint;
     try {
-      // BOLT OPTIMIZATION: Avoid redundant fs.pathExists check, rely on try/catch to handle ENOENT directly
+      // BOLT OPTIMIZATION: Avoid double I/O. Instead of checking pathExists then reading,
+      // just try reading and handle ENOENT.
       rollbackPoint = await fs.readJSON(pointPath);
     } catch (error) {
       if (error.code === 'ENOENT') {
@@ -307,15 +308,16 @@ class RollbackManager {
     
     if (changes.files && changes.files.length > 0) {
       state.files = {};
-      // BOLT OPTIMIZATION: Avoid double I/O. Instead of checking pathExists then reading/stat,
-      // use Promise.all to fetch both simultaneously and handle ENOENT.
-      // Used chunked Promise.all to prevent EMFILE errors with large numbers of files.
-      const CHUNK_SIZE = 20;
-      for (let i = 0; i < changes.files.length; i += CHUNK_SIZE) {
-        const chunk = changes.files.slice(i, i + CHUNK_SIZE);
-        const promises = chunk.map(async (fileChange) => {
+
+      // BOLT OPTIMIZATION: Process files concurrently and avoid redundant pathExists checks
+      // chunked concurrency ensures we don't hit EMFILE errors
+      const concurrencyLimit = 20;
+      for (let i = 0; i < changes.files.length; i += concurrencyLimit) {
+        const chunk = changes.files.slice(i, i + concurrencyLimit);
+        const results = await Promise.all(chunk.map(async (fileChange) => {
           const filePath = path.join(this.projectRoot, fileChange.path);
           try {
+            // Run read and stat concurrently
             const [content, stats] = await Promise.all([
               fs.readFile(filePath, 'utf8'),
               fs.stat(filePath)
@@ -332,16 +334,18 @@ class RollbackManager {
             if (error.code === 'ENOENT') {
               return {
                 path: fileChange.path,
-                data: { exists: false }
+                data: {
+                  exists: false
+                }
               };
             }
             throw error;
           }
-        });
+        }));
         
-        const results = await Promise.all(promises);
-        for (const result of results) {
-          state.files[result.path] = result.data;
+        // Sync results to maintain deterministic object state
+        for (const res of results) {
+          state.files[res.path] = res.data;
         }
       };
 

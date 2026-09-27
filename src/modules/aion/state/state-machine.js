@@ -127,7 +127,8 @@ class StateMachine {
    */
   async loadHandoverLog() {
     try {
-      // BOLT OPTIMIZATION: Avoid double I/O. Try reading directly and catch ENOENT.
+      // BOLT OPTIMIZATION: Avoid double I/O. Instead of checking pathExists then reading,
+      // just try reading and handle ENOENT.
       const content = await fs.readFile(this.handoverLogPath, 'utf8');
       this.parseHandoverLog(content);
     } catch (error) {
