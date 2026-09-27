@@ -1,0 +1,3 @@
+## 2024-05-18 - [I/O Optimization] Chunked concurrent file state capture
+**Learning:** Sequential disk I/O, particularly with `fs.pathExists` followed by `fs.readFile` and `fs.stat`, acts as a significant bottleneck when processing file paths, adding latency to application operations such as creating rollback points.
+**Action:** Removed redundant `fs.pathExists` calls. Refactored array iteration to use chunked `Promise.all` processing, mapping native file system `ENOENT` errors in `try/catch` handlers for improved concurrent throughput while avoiding EMFILE limits.

@@ -298,19 +298,35 @@ class RollbackManager {
     
     if (changes.files) {
       state.files = {};
-      for (const fileChange of changes.files) {
-        const filePath = path.join(this.projectRoot, fileChange.path);
+      // Chunk size of 20 to prevent EMFILE errors
+      const chunkSize = 20;
+      for (let i = 0; i < changes.files.length; i += chunkSize) {
+        const chunk = changes.files.slice(i, i + chunkSize);
         
-        if (await fs.pathExists(filePath)) {
-          state.files[fileChange.path] = {
-            exists: true,
-            content: await fs.readFile(filePath, 'utf8'),
-            stats: await fs.stat(filePath)
-          };
-        } else {
-          state.files[fileChange.path] = {
-            exists: false
-          };
+        // Execute chunk concurrently
+        const results = await Promise.all(chunk.map(async (fileChange) => {
+          const filePath = path.join(this.projectRoot, fileChange.path);
+          try {
+            // Read and stat concurrently, avoiding unnecessary fs.pathExists
+            const [content, stats] = await Promise.all([
+              fs.readFile(filePath, 'utf8'),
+              fs.stat(filePath)
+            ]);
+            return {
+              path: fileChange.path,
+              data: { exists: true, content, stats }
+            };
+          } catch (err) {
+            if (err.code === 'ENOENT') {
+              return { path: fileChange.path, data: { exists: false } };
+            }
+            throw err;
+          }
+        }));
+
+        // Synchronously populate state to ensure deterministic behavior
+        for (const res of results) {
+          state.files[res.path] = res.data;
         }
       }
     }
