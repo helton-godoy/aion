@@ -1,15 +1,13 @@
 const SafetyProtocol = require('../../../../src/modules/aion/safety/safety-protocol');
 const path = require('path');
 
-// Wrap the old script logic in a Jest test block
+// Dummy test block to satisfy Jest when running in test suite
 if (typeof test === 'function') {
-  test('Path traversal test runner', async () => {
-    // This is just a dummy test so Jest doesn't fail with "Your test suite must contain at least one test."
+  test('standalone script dummy test', () => {
     expect(true).toBe(true);
   });
 }
 
-// Keep the existing standalone logic
 async function reproduce() {
   if (typeof jest !== 'undefined') return; // Don't run in Jest context
 
