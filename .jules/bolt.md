@@ -1,0 +1,4 @@
+
+## 2024-05-08 - Parallelize Safety Protocol File I/O v2
+**Learning:** The `safety-protocol.js` module had a bottleneck where file changes during `captureCurrentState` were processed sequentially using `for...of` loops over arrays of changes. This caused massive cumulative delays for commits involving many files. Unbounded Promise.all over all files is unsafe as it causes EMFILE crashes and memory exhaustion. Similarly, `executeChanges` and `restoreState` must remain sequential because of chronological safety requirements (like creating directories before saving inside them).
+**Action:** Replaced sequential loop in `captureCurrentState` with chunked `Promise.all(chunk.map())` logic (size 20). Also consolidated sequential `pathExists`, `readFile`, and `stat` calls into concurrent `Promise.all([fs.stat(), fs.readFile()])` with try-catch logic handling `ENOENT` to vastly speed up file state captures without crashing.
