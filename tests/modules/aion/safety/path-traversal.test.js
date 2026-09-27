@@ -77,6 +77,4 @@ reproduce().catch(err => {
     console.error(err);
     process.exit(1);
 });
-
-
-test('dummy test to satisfy Jest', () => { expect(true).toBe(true); });
+test('dummy', () => {});

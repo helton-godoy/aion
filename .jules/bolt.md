@@ -1,3 +1,3 @@
-## 2025-02-28 - Optimized File System I/O in SafetyProtocol
-**Learning:** Checking `fs.pathExists` immediately before `fs.readFile` or `fs.stat` is a double I/O anti-pattern that slows down performance. Also, processing arrays of files sequentially can block when parallelization is possible.
-**Action:** Consolidate file existence checks with `try/catch` and handle `ENOENT` errors natively. In operations dealing with arrays of file actions, chunk the processes using `Promise.all` for parallel reading, while ensuring the synchronous assembly of states guarantees consistent key ordering.
+## 2024-06-27 - Optimize File System Checks
+**Learning:** Using `fs.pathExists` before reading/stating files is an anti-pattern as it adds unnecessary I/O overhead. Additionally, processing unbounded file arrays concurrently using `Promise.all` can lead to `EMFILE` errors.
+**Action:** Use `try/catch` with `ENOENT` error handling when checking for file existence instead of `fs.pathExists`. Use chunked `Promise.all` (e.g., chunk size 20) when processing many files concurrently to prevent EMFILE errors, while maintaining a synchronous array push to preserve deterministic key insertion order.
