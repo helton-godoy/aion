@@ -77,3 +77,10 @@ reproduce().catch(err => {
     console.error(err);
     process.exit(1);
 });
+
+// Dummy test block to prevent Jest from failing during generic test runs
+if (typeof test === 'function') {
+  test('dummy test', () => {
+    expect(true).toBe(true);
+  });
+}

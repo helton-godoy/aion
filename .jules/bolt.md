@@ -1,0 +1,3 @@
+## 2024-05-24 - Optimize Disk I/O with Concurrent Error Handling
+**Learning:** Sequential fs operations (pathExists, then readFile/stat) create significant bottlenecks in Node.js apps handling numerous files.
+**Action:** When performing file system tasks over multiple files, eliminate proactive `fs.pathExists` checks. Instead, execute the core operations (`fs.readFile`, `fs.stat`) concurrently with chunked `Promise.all` blocks to avoid EMFILE limits, and rely on catching `ENOENT` natively to determine existence. Ensure state maps are synchronously populated after resolving the promises to maintain exact insertion order.
