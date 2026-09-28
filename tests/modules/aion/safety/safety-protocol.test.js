@@ -261,6 +261,28 @@ describe('SafetyProtocol Change Execution & Helper Classes', () => {
       expect(fileSpy).toHaveBeenCalledWith(changes.files[0]);
       expect(apiSpy).toHaveBeenCalledWith(changes.api[0]);
     });
+
+    it('should handle null or undefined changes gracefully', async () => {
+      const fileSpy = jest.spyOn(safetyProtocol, 'executeFileChange').mockResolvedValue();
+      const apiSpy = jest.spyOn(safetyProtocol, 'executeApiCall').mockResolvedValue();
+
+      await expect(safetyProtocol.executeChanges(null)).resolves.not.toThrow();
+      await expect(safetyProtocol.executeChanges(undefined)).resolves.not.toThrow();
+
+      expect(fileSpy).not.toHaveBeenCalled();
+      expect(apiSpy).not.toHaveBeenCalled();
+    });
+
+    it('should safely handle empty or non-array files and api properties', async () => {
+      const fileSpy = jest.spyOn(safetyProtocol, 'executeFileChange').mockResolvedValue();
+      const apiSpy = jest.spyOn(safetyProtocol, 'executeApiCall').mockResolvedValue();
+
+      await safetyProtocol.executeChanges({});
+      await safetyProtocol.executeChanges({ files: 'invalid', api: null });
+
+      expect(fileSpy).not.toHaveBeenCalled();
+      expect(apiSpy).not.toHaveBeenCalled();
+    });
   });
 
   describe('executeFileChange', () => {
