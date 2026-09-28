@@ -358,6 +358,107 @@ describe('SafetyProtocol Change Execution & Helper Classes', () => {
         .rejects.toThrow('Rollback point missing-rb not found');
     });
 
+  describe('executeApiCall', () => {
+    let fetchSpy;
+
+    beforeEach(() => {
+      fetchSpy = jest.spyOn(global, 'fetch');
+    });
+
+    afterEach(() => {
+      fetchSpy.mockRestore();
+    });
+
+    it('should throw error if apiCall is falsy', async () => {
+      await expect(safetyProtocol.executeApiCall(null)).rejects.toThrow('API call object is required');
+    });
+
+    it('should throw error if endpoint and url are missing', async () => {
+      await expect(safetyProtocol.executeApiCall({ method: 'GET' })).rejects.toThrow('API call requires an endpoint or url');
+    });
+
+    it('should execute GET call successfully', async () => {
+      const mockResponse = {
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        headers: { get: (name) => (name.toLowerCase() === 'content-type' ? 'application/json' : null) },
+        json: jest.fn().mockResolvedValue({ success: true })
+      };
+      fetchSpy.mockResolvedValue(mockResponse);
+
+      const result = await safetyProtocol.executeApiCall({ endpoint: 'https://api.example.com/test' });
+
+      expect(fetchSpy).toHaveBeenCalledWith('https://api.example.com/test', {
+        method: 'GET',
+        headers: {}
+      });
+      expect(result.data).toEqual({ success: true });
+      expect(result.status).toBe(200);
+    });
+
+    it('should execute POST call with object payload and custom headers', async () => {
+      const mockResponse = {
+        ok: true,
+        status: 201,
+        statusText: 'Created',
+        headers: { get: (name) => (name.toLowerCase() === 'content-type' ? 'application/json' : null) },
+        json: jest.fn().mockResolvedValue({ id: 123 })
+      };
+      fetchSpy.mockResolvedValue(mockResponse);
+
+      const apiCall = {
+        url: 'https://api.example.com/items',
+        method: 'POST',
+        body: { name: 'item1' },
+        headers: { Authorization: 'Bearer token' }
+      };
+
+      const result = await safetyProtocol.executeApiCall(apiCall);
+
+      expect(fetchSpy).toHaveBeenCalledWith('https://api.example.com/items', {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer token',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ name: 'item1' })
+      });
+      expect(result.data).toEqual({ id: 123 });
+      expect(result.status).toBe(201);
+    });
+
+    it('should handle text response when content-type is text/plain', async () => {
+      const mockResponse = {
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        headers: { get: (name) => (name.toLowerCase() === 'content-type' ? 'text/plain' : null) },
+        text: jest.fn().mockResolvedValue('hello world')
+      };
+      fetchSpy.mockResolvedValue(mockResponse);
+
+      const result = await safetyProtocol.executeApiCall({ endpoint: 'https://api.example.com/text' });
+
+      expect(result.data).toBe('hello world');
+    });
+
+    it('should throw error when response is not ok', async () => {
+      const mockResponse = {
+        ok: false,
+        status: 404,
+        statusText: 'Not Found',
+        headers: { get: () => null },
+        text: jest.fn().mockResolvedValue('Not found')
+      };
+      fetchSpy.mockResolvedValue(mockResponse);
+
+      await expect(
+        safetyProtocol.executeApiCall({ endpoint: 'https://api.example.com/missing' })
+      ).rejects.toThrow('API call failed with status 404: Not Found');
+    });
+  });
+
   describe('Validators', () => {
     it('FileValidator should detect path traversal', async () => {
       const changes = { files: [{ path: '../../etc/passwd' }] };
