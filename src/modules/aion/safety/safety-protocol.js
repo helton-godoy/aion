@@ -137,16 +137,17 @@ class SafetyProtocol {
    * Execute changes
    */
   async executeChanges(changes) {
-    // TODO: Implement change execution logic
-    // This would depend on the type of changes (file operations, API calls, etc.)
-    
-    if (changes.files) {
+    if (!changes) {
+      return;
+    }
+
+    if (Array.isArray(changes.files)) {
       for (const fileChange of changes.files) {
         await this.executeFileChange(fileChange);
       }
     }
-    
-    if (changes.api) {
+
+    if (Array.isArray(changes.api)) {
       for (const apiCall of changes.api) {
         await this.executeApiCall(apiCall);
       }
