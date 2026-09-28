@@ -180,10 +180,59 @@ class SafetyProtocol {
 
   /**
    * Execute API call
+   * @param {Object} apiCall - Object containing endpoint/url, method, headers, body/data/payload, options
+   * @returns {Promise<Object>} Response object containing status, statusText, headers, data
    */
   async executeApiCall(apiCall) {
-    // TODO: Implement API call execution
-    console.log(chalk.blue(`📡 Executing API call: ${apiCall.method} ${apiCall.endpoint}`));
+    if (!apiCall) {
+      throw new Error("API call object is required");
+    }
+
+    const endpoint = apiCall.endpoint || apiCall.url;
+    if (!endpoint) {
+      throw new Error("API call requires an endpoint or url");
+    }
+
+    const method = (apiCall.method || "GET").toUpperCase();
+    console.log(chalk.blue(`📡 Executing API call: ${method} ${endpoint}`));
+
+    const headers = { ...apiCall.headers };
+    let body = apiCall.body ?? apiCall.data ?? apiCall.payload;
+
+    if (body !== undefined && typeof body === "object" && body !== null && !(body instanceof ArrayBuffer) && !ArrayBuffer.isView(body)) {
+      body = JSON.stringify(body);
+      if (!Object.keys(headers).some(h => h.toLowerCase() === "content-type")) {
+        headers["Content-Type"] = "application/json";
+      }
+    }
+
+    const fetchOptions = {
+      method,
+      headers,
+      ...(body !== undefined && method !== "GET" && method !== "HEAD" ? { body } : {}),
+      ...apiCall.options
+    };
+
+    const response = await fetch(endpoint, fetchOptions);
+
+    let data;
+    const contentType = response.headers ? (response.headers.get ? response.headers.get("content-type") : response.headers["content-type"]) || "" : "";
+    if (contentType.includes("application/json")) {
+      data = await response.json().catch(() => null);
+    } else {
+      data = await response.text().catch(() => null);
+    }
+
+    if (!response.ok) {
+      throw new Error(`API call failed with status ${response.status}: ${response.statusText || "Error"}`);
+    }
+
+    return {
+      status: response.status,
+      statusText: response.statusText,
+      headers: response.headers,
+      data
+    };
   }
 
   /**
