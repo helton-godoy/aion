@@ -46,7 +46,7 @@
     "dotenv": "^16.6.1",
     "fs-extra": "^11.3.0",
     "inquirer": "^8.2.6",
-    "js-yaml": "^4.1.0",
+    "js-yaml": "^4.3.2",
     "ora": "^5.4.1",
     "semver": "^7.6.3",
     "chalk": "^4.1.2",
@@ -55,7 +55,7 @@
     "figlet": "^1.8.0"
   },
   "devDependencies": {
-    "@babel/core": "^7.23.0",
+    "@babel/core": "^7.29.7",
     "@babel/preset-env": "^7.23.0",
     "@eslint/js": "^9.33.0",
     "babel-jest": "^29.7.0",
